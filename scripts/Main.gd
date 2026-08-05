@@ -1,0 +1,314 @@
+extends Node2D
+# Orquestra tudo: constrói o ecrã de criação e o HUD por código,
+# cria a Arena e liga os sinais. A UI aqui é propositadamente
+# simples (sem tema) — a ideia é desenhá-la depois no editor.
+
+const TOTAL_POINTS := 6
+const PALETTE := ["f4c145", "d1453b", "4fd6c9", "9b6cff", "6dd36a", "e08a3c", "5a86b4", "ece5d3"]
+
+var cfg := {
+	"cls": "Bruto",
+	"name": "",
+	"color": Color("f4c145"),
+	"points": {"hp": 0, "atk": 0, "def": 0, "spd": 0},
+}
+
+var arena: Arena
+var ui: CanvasLayer
+var creation_root: Control
+var hud_root: Control
+
+# refs de UI
+var class_buttons := {}
+var stats_label: Label
+var color_preview: ColorRect
+var points_left_label: Label
+var point_value_labels := {}
+
+var hud_alive: Label
+var hud_phase: Label
+var hud_gear: Label
+var hp_fill: ColorRect
+var hp_label: Label
+var banner_big: Label
+var banner_sub: Label
+var banner_box: Control
+
+func _ready() -> void:
+	arena = Arena.new()
+	add_child(arena)
+	arena.alive_changed.connect(_on_alive_changed)
+	arena.phase_changed.connect(_on_phase_changed)
+	arena.show_banner.connect(_on_banner)
+
+	ui = CanvasLayer.new()
+	add_child(ui)
+	_build_creation()
+	_build_hud()
+	_select_class("Bruto")
+
+func _process(_delta: float) -> void:
+	# atualiza HP e equipamento do jogador (poll simples)
+	if hud_root.visible and arena.player != null and arena.player.alive:
+		var p = arena.player
+		hp_fill.size.x = hp_fill.get_parent().size.x * clamp(p.hp / p.max_hp, 0.0, 1.0)
+		hp_label.text = "%s  ·  %s" % [p.display_name, p.cls]
+		hud_gear.text = _gear_text(p)
+
+func _gear_text(p) -> String:
+	var s := ""
+	if p.weapons.size() > 0:
+		var sum := 0
+		for w in p.weapons:
+			sum += int(w)
+		s += "Armas x%d (+%d%%)  " % [p.weapons.size(), sum]
+	if p.has_armor:
+		s += "Armadura  "
+	var h := 0
+	var cr := 0
+	for a in p.amulets:
+		if a == "heal": h += 1
+		else: cr += 1
+	if h > 0: s += "Cura x%d  " % h
+	if cr > 0: s += "Crit x%d" % cr
+	return s
+
+# ============ ECRÃ DE CRIAÇÃO ============
+func _build_creation() -> void:
+	creation_root = Control.new()
+	creation_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(creation_root)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	creation_root.add_child(center)
+
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for m in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(m, 22)
+	panel.add_child(margin)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	vb.custom_minimum_size = Vector2(560, 0)
+	margin.add_child(vb)
+
+	vb.add_child(_title("TITAN ROYALE", 26, Color("f4c145")))
+	vb.add_child(_title("1 · Escolhe a tua classe", 12, Color("8a8fa3")))
+
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	vb.add_child(grid)
+	for cls in Arch.names():
+		var b := Button.new()
+		b.text = cls
+		b.custom_minimum_size = Vector2(130, 34)
+		b.pressed.connect(_select_class.bind(cls))
+		grid.add_child(b)
+		class_buttons[cls] = b
+
+	stats_label = Label.new()
+	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(stats_label)
+
+	vb.add_child(_title("2 · O teu lutador", 12, Color("8a8fa3")))
+
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	vb.add_child(name_row)
+	var nlbl := Label.new()
+	nlbl.text = "Nome:"
+	name_row.add_child(nlbl)
+	var line := LineEdit.new()
+	line.placeholder_text = "Heroi sem nome"
+	line.max_length = 14
+	line.custom_minimum_size = Vector2(220, 0)
+	line.text_changed.connect(func(t): cfg["name"] = t.strip_edges())
+	name_row.add_child(line)
+
+	var color_row := HBoxContainer.new()
+	color_row.add_theme_constant_override("separation", 8)
+	vb.add_child(color_row)
+	var clbl := Label.new()
+	clbl.text = "Cor:"
+	color_row.add_child(clbl)
+	for hex in PALETTE:
+		var sw := ColorRect.new()
+		sw.color = Color(hex)
+		sw.custom_minimum_size = Vector2(26, 26)
+		sw.mouse_filter = Control.MOUSE_FILTER_STOP
+		sw.gui_input.connect(func(e): _on_swatch(e, hex))
+		color_row.add_child(sw)
+	color_preview = ColorRect.new()
+	color_preview.color = cfg["color"]
+	color_preview.custom_minimum_size = Vector2(26, 26)
+	color_row.add_child(color_preview)
+
+	points_left_label = Label.new()
+	vb.add_child(points_left_label)
+	for key in ["hp", "atk", "def", "spd"]:
+		vb.add_child(_point_row(key))
+
+	var start := Button.new()
+	start.text = "ENTRAR NA ARENA"
+	start.custom_minimum_size = Vector2(0, 42)
+	start.pressed.connect(_start_game)
+	vb.add_child(start)
+
+	_refresh_points()
+
+func _title(txt: String, sz: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.add_theme_font_size_override("font_size", sz)
+	l.add_theme_color_override("font_color", col)
+	return l
+
+func _point_row(key: String) -> HBoxContainer:
+	var labels := {"hp": "Vida", "atk": "Ataque", "def": "Defesa", "spd": "Velocidade"}
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var name_l := Label.new()
+	name_l.text = labels[key]
+	name_l.custom_minimum_size = Vector2(120, 0)
+	row.add_child(name_l)
+	var minus := Button.new()
+	minus.text = "-"
+	minus.custom_minimum_size = Vector2(32, 0)
+	minus.pressed.connect(_change_point.bind(key, -1))
+	row.add_child(minus)
+	var val := Label.new()
+	val.text = "0"
+	val.custom_minimum_size = Vector2(24, 0)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(val)
+	point_value_labels[key] = val
+	var plus := Button.new()
+	plus.text = "+"
+	plus.custom_minimum_size = Vector2(32, 0)
+	plus.pressed.connect(_change_point.bind(key, 1))
+	row.add_child(plus)
+	return row
+
+func _points_used() -> int:
+	var pts: Dictionary = cfg["points"]
+	return pts["hp"] + pts["atk"] + pts["def"] + pts["spd"]
+
+func _change_point(key: String, d: int) -> void:
+	var pts: Dictionary = cfg["points"]
+	if d > 0 and _points_used() >= TOTAL_POINTS:
+		return
+	if d < 0 and pts[key] <= 0:
+		return
+	pts[key] = max(0, pts[key] + d)
+	_refresh_points()
+
+func _refresh_points() -> void:
+	points_left_label.text = "Pontos de stats — restam %d" % (TOTAL_POINTS - _points_used())
+	for key in point_value_labels:
+		point_value_labels[key].text = str(cfg["points"][key])
+
+func _on_swatch(e: InputEvent, hex: String) -> void:
+	if e is InputEventMouseButton and e.pressed:
+		cfg["color"] = Color(hex)
+		color_preview.color = cfg["color"]
+
+func _select_class(cls: String) -> void:
+	cfg["cls"] = cls
+	for name in class_buttons:
+		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
+	var a: Dictionary = Arch.DATA[cls]
+	stats_label.text = "%s — %s\nVida %d · Ataque %d · Defesa %d · Vel %d · Alcance %d" % [
+		cls, a["role"], int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
+	]
+
+# ============ HUD ============
+func _build_hud() -> void:
+	hud_root = Control.new()
+	hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_root.visible = false
+	ui.add_child(hud_root)
+
+	hud_alive = Label.new()
+	hud_alive.position = Vector2(16, 12)
+	hud_alive.text = "Vivos: 100"
+	hud_root.add_child(hud_alive)
+
+	hud_phase = Label.new()
+	hud_phase.position = Vector2(16, 34)
+	hud_phase.text = "Fase: Royale"
+	hud_root.add_child(hud_phase)
+
+	# barra de vida do jogador (em baixo)
+	var hp_bg := ColorRect.new()
+	hp_bg.color = Color(0, 0, 0, 0.55)
+	hp_bg.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	hp_bg.offset_left = 16
+	hp_bg.offset_right = -16
+	hp_bg.offset_top = -34
+	hp_bg.offset_bottom = -16
+	hud_root.add_child(hp_bg)
+	hp_fill = ColorRect.new()
+	hp_fill.color = Color("6dd36a")
+	hp_fill.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	hp_fill.offset_top = 0
+	hp_fill.offset_bottom = 0
+	hp_fill.size = Vector2(200, 18)
+	hp_bg.add_child(hp_fill)
+	hp_label = Label.new()
+	hp_label.add_theme_font_size_override("font_size", 11)
+	hp_label.position = Vector2(6, -1)
+	hp_bg.add_child(hp_label)
+
+	hud_gear = Label.new()
+	hud_gear.add_theme_font_size_override("font_size", 11)
+	hud_gear.add_theme_color_override("font_color", Color("f4c145"))
+	hud_gear.position = Vector2(16, -56)
+	hud_gear.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	hud_gear.offset_top = -56
+	hud_root.add_child(hud_gear)
+
+	# banner central
+	banner_box = VBoxContainer.new()
+	banner_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	banner_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	banner_box.visible = false
+	hud_root.add_child(banner_box)
+	banner_big = Label.new()
+	banner_big.add_theme_font_size_override("font_size", 46)
+	banner_big.add_theme_color_override("font_color", Color("f4c145"))
+	banner_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_box.add_child(banner_big)
+	banner_sub = Label.new()
+	banner_sub.add_theme_color_override("font_color", Color("ece5d3"))
+	banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_box.add_child(banner_sub)
+
+func _start_game() -> void:
+	creation_root.visible = false
+	hud_root.visible = true
+	banner_box.visible = false
+	arena.setup(cfg)
+
+func _on_alive_changed(n: int) -> void:
+	hud_alive.text = "Vivos: %d" % n
+
+func _on_phase_changed(name: String) -> void:
+	hud_phase.text = "Fase: %s" % name
+
+func _on_banner(big: String, sub: String, dead: bool) -> void:
+	banner_big.text = big
+	banner_big.add_theme_color_override("font_color", Color("d1453b") if dead else Color("f4c145"))
+	banner_sub.text = sub
+	banner_box.visible = true
+	# banners transitórios desaparecem sozinhos; morte/vitória ficam
+	if not dead and big == "Top 6":
+		await get_tree().create_timer(1.6).timeout
+		if arena.phase == Arena.Phase.TITAN or arena.phase == Arena.Phase.TRANSITION:
+			banner_box.visible = false
