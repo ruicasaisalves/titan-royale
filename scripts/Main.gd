@@ -51,7 +51,7 @@ func _process(_delta: float) -> void:
 	# atualiza HP e equipamento do jogador (poll simples)
 	if hud_root.visible and arena.player != null and arena.player.alive:
 		var p = arena.player
-		hp_fill.size.x = hp_fill.get_parent().size.x * clamp(p.hp / p.max_hp, 0.0, 1.0)
+		hp_fill.anchor_right = clamp(p.hp / p.max_hp, 0.0, 1.0)
 		hp_label.text = "%s  ·  %s" % [p.display_name, p.cls]
 		hud_gear.text = _gear_text(p)
 
@@ -220,8 +220,8 @@ func _on_swatch(e: InputEvent, hex: String) -> void:
 
 func _select_class(cls: String) -> void:
 	cfg["cls"] = cls
-	for name in class_buttons:
-		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
+	for cn in class_buttons:
+		class_buttons[cn].modulate = Color("f4c145") if cn == cls else Color.WHITE
 	var a: Dictionary = Arch.DATA[cls]
 	stats_label.text = "%s — %s\nVida %d · Ataque %d · Defesa %d · Vel %d · Alcance %d" % [
 		cls, a["role"], int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
@@ -256,10 +256,9 @@ func _build_hud() -> void:
 	hud_root.add_child(hp_bg)
 	hp_fill = ColorRect.new()
 	hp_fill.color = Color("6dd36a")
-	hp_fill.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
-	hp_fill.offset_top = 0
-	hp_fill.offset_bottom = 0
-	hp_fill.size = Vector2(200, 18)
+	# A largura é a fração de vida: em vez de mexer no size (que os anchors
+	# não-iguais-opostos anulam), controlamos a borda direita via anchor_right.
+	hp_fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hp_bg.add_child(hp_fill)
 	hp_label = Label.new()
 	hp_label.add_theme_font_size_override("font_size", 11)
@@ -299,8 +298,8 @@ func _start_game() -> void:
 func _on_alive_changed(n: int) -> void:
 	hud_alive.text = "Vivos: %d" % n
 
-func _on_phase_changed(name: String) -> void:
-	hud_phase.text = "Fase: %s" % name
+func _on_phase_changed(phase_name: String) -> void:
+	hud_phase.text = "Fase: %s" % phase_name
 
 func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_big.text = big

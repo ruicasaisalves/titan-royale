@@ -12,7 +12,7 @@ extends Node2D
 # ============================================================
 
 signal alive_changed(n)
-signal phase_changed(name)
+signal phase_changed(phase_name)
 signal player_hp_changed(pct)
 signal show_banner(big, sub, dead)
 
@@ -107,10 +107,10 @@ func _make_player(cfg: Dictionary) -> Fighter:
 	f.position = world_size / 2.0
 	return f
 
-func _make_zombie(victim, owner) -> Fighter:
+func _make_zombie(victim, necro) -> Fighter:
 	var f := Fighter.new()
 	f.cls = "Zombie"
-	f.team = owner.team
+	f.team = necro.team
 	f.controller = AIController.new()
 	f.color = ZOMBIE_COLOR
 	f.max_hp = max(6.0, victim.max_hp * 0.1)
@@ -123,7 +123,7 @@ func _make_zombie(victim, owner) -> Fighter:
 	f.cd_timer = randf_range(0.0, 0.8)
 	f.size = max(6.0, victim.size * 0.7)
 	f.is_zombie = true
-	f.owner_fighter = owner
+	f.owner_fighter = necro
 	f.contender = false
 	f.position = victim.position
 	return f
