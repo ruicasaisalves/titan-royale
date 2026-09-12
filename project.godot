@@ -1,27 +1,21 @@
-; Engine configuration file.
-; It's best edited using the editor UI and not directly,
-; since the parameters that go here are not all obvious.
-;
-; Format:
-;   [section] ; section goes between []
-;   param=value ; assign values to parameters
+; Titan Royale — projeto Godot 4
+; Abre a pasta no Godot 4.2+ e carrega em Play (F5).
+; Preparado para Android: renderizador compatível, paisagem, controlos táteis.
 
 config_version=5
-
-[animation]
-
-compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Titan Royale"
+config/version="0.03a"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.7")
+config/features=PackedStringArray("4.2")
 config/icon="res://icon.svg"
 
 [autoload]
 
 Arch="*res://scripts/Archetypes.gd"
+Touch="*res://scripts/TouchInput.gd"
 
 [display]
 
@@ -29,6 +23,13 @@ window/size/viewport_width=960
 window/size/viewport_height=600
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+; 4 = sensor_landscape: roda entre as duas orientações de paisagem
+window/handheld/orientation=4
+
+[input_devices]
+
+; o rato gera eventos de toque -> dá para testar o joystick no PC
+pointing/emulate_touch_from_mouse=true
 
 [rendering]
 

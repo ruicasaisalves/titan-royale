@@ -51,7 +51,7 @@ func _process(_delta: float) -> void:
 	# atualiza HP e equipamento do jogador (poll simples)
 	if hud_root.visible and arena.player != null and arena.player.alive:
 		var p = arena.player
-		hp_fill.anchor_right = clamp(p.hp / p.max_hp, 0.0, 1.0)
+		hp_fill.size.x = hp_fill.get_parent().size.x * clamp(p.hp / p.max_hp, 0.0, 1.0)
 		hp_label.text = "%s  ·  %s" % [p.display_name, p.cls]
 		hud_gear.text = _gear_text(p)
 
@@ -88,39 +88,65 @@ func _build_creation() -> void:
 
 	var margin := MarginContainer.new()
 	for m in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(m, 22)
+		margin.add_theme_constant_override(m, 20)
 	panel.add_child(margin)
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 12)
-	vb.custom_minimum_size = Vector2(560, 0)
+	vb.add_theme_constant_override("separation", 10)
 	margin.add_child(vb)
 
-	vb.add_child(_title("TITAN ROYALE", 26, Color("f4c145")))
-	vb.add_child(_title("1 · Escolhe a tua classe", 12, Color("8a8fa3")))
+	# título + versão (lida de Project Settings -> Application -> Config -> Version)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 10)
+	title_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	vb.add_child(title_row)
+	title_row.add_child(_title("TITAN ROYALE", 26, Color("f4c145")))
+	var ver := _title("v" + str(ProjectSettings.get_setting("application/config/version", "0.0")), 11, Color("8a8fa3"))
+	ver.size_flags_vertical = Control.SIZE_SHRINK_END
+	title_row.add_child(ver)
 
+	# Duas colunas lado a lado (classes | lutador) para caber nos 600px
+	# de altura — uma coluna única com botões de toque ficava cortada.
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 28)
+	vb.add_child(cols)
+
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 10)
+	left.custom_minimum_size = Vector2(290, 0)
+	cols.add_child(left)
+
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 10)
+	right.custom_minimum_size = Vector2(340, 0)
+	cols.add_child(right)
+
+	# ---- coluna esquerda: classes ----
+	left.add_child(_title("1 · Escolhe a tua classe", 12, Color("8a8fa3")))
 	var grid := GridContainer.new()
-	grid.columns = 4
+	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
-	vb.add_child(grid)
+	left.add_child(grid)
 	for cls in Arch.names():
 		var b := Button.new()
 		b.text = cls
-		b.custom_minimum_size = Vector2(130, 34)
+		b.custom_minimum_size = Vector2(140, 44)
 		b.pressed.connect(_select_class.bind(cls))
 		grid.add_child(b)
 		class_buttons[cls] = b
 
 	stats_label = Label.new()
 	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vb.add_child(stats_label)
+	stats_label.custom_minimum_size = Vector2(290, 0)
+	left.add_child(stats_label)
 
-	vb.add_child(_title("2 · O teu lutador", 12, Color("8a8fa3")))
+	# ---- coluna direita: o teu lutador ----
+	right.add_child(_title("2 · O teu lutador", 12, Color("8a8fa3")))
 
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 10)
-	vb.add_child(name_row)
+	right.add_child(name_row)
 	var nlbl := Label.new()
 	nlbl.text = "Nome:"
 	name_row.add_child(nlbl)
@@ -133,7 +159,7 @@ func _build_creation() -> void:
 
 	var color_row := HBoxContainer.new()
 	color_row.add_theme_constant_override("separation", 8)
-	vb.add_child(color_row)
+	right.add_child(color_row)
 	var clbl := Label.new()
 	clbl.text = "Cor:"
 	color_row.add_child(clbl)
@@ -150,15 +176,24 @@ func _build_creation() -> void:
 	color_row.add_child(color_preview)
 
 	points_left_label = Label.new()
-	vb.add_child(points_left_label)
+	right.add_child(points_left_label)
 	for key in ["hp", "atk", "def", "spd"]:
-		vb.add_child(_point_row(key))
+		right.add_child(_point_row(key))
+
+	var hint := Label.new()
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color("8a8fa3"))
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(340, 0)
+	hint.text = ("Toque: joystick a esquerda, ATACAR / DASH a direita."
+		if Touch.enabled else "WASD/setas mover · espaco atacar · shift dash · ou arrasta o rato")
+	right.add_child(hint)
 
 	var start := Button.new()
 	start.text = "ENTRAR NA ARENA"
-	start.custom_minimum_size = Vector2(0, 42)
+	start.custom_minimum_size = Vector2(0, 50)
 	start.pressed.connect(_start_game)
-	vb.add_child(start)
+	right.add_child(start)
 
 	_refresh_points()
 
@@ -179,7 +214,7 @@ func _point_row(key: String) -> HBoxContainer:
 	row.add_child(name_l)
 	var minus := Button.new()
 	minus.text = "-"
-	minus.custom_minimum_size = Vector2(32, 0)
+	minus.custom_minimum_size = Vector2(44, 44)
 	minus.pressed.connect(_change_point.bind(key, -1))
 	row.add_child(minus)
 	var val := Label.new()
@@ -190,7 +225,7 @@ func _point_row(key: String) -> HBoxContainer:
 	point_value_labels[key] = val
 	var plus := Button.new()
 	plus.text = "+"
-	plus.custom_minimum_size = Vector2(32, 0)
+	plus.custom_minimum_size = Vector2(44, 44)
 	plus.pressed.connect(_change_point.bind(key, 1))
 	row.add_child(plus)
 	return row
@@ -220,8 +255,8 @@ func _on_swatch(e: InputEvent, hex: String) -> void:
 
 func _select_class(cls: String) -> void:
 	cfg["cls"] = cls
-	for cn in class_buttons:
-		class_buttons[cn].modulate = Color("f4c145") if cn == cls else Color.WHITE
+	for name in class_buttons:
+		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
 	var a: Dictionary = Arch.DATA[cls]
 	stats_label.text = "%s — %s\nVida %d · Ataque %d · Defesa %d · Vel %d · Alcance %d" % [
 		cls, a["role"], int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
@@ -235,43 +270,46 @@ func _build_hud() -> void:
 	hud_root.visible = false
 	ui.add_child(hud_root)
 
-	hud_alive = Label.new()
-	hud_alive.position = Vector2(16, 12)
-	hud_alive.text = "Vivos: 100"
-	hud_root.add_child(hud_alive)
+	# indicadores no topo — centrados, fonte maior
+	var top_box := VBoxContainer.new()
+	top_box.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top_box.offset_top = 10
+	top_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_box.add_theme_constant_override("separation", 2)
+	hud_root.add_child(top_box)
+	hud_alive = _hud_label("Vivos: %d" % (Arena.OPPONENTS + 1), 20, Color("ece5d3"))
+	top_box.add_child(hud_alive)
+	hud_phase = _hud_label("Fase: Royale", 15, Color("8a8fa3"))
+	top_box.add_child(hud_phase)
+	hud_gear = _hud_label("", 14, Color("f4c145"))
+	top_box.add_child(hud_gear)
 
-	hud_phase = Label.new()
-	hud_phase.position = Vector2(16, 34)
-	hud_phase.text = "Fase: Royale"
-	hud_root.add_child(hud_phase)
-
-	# barra de vida do jogador (em baixo)
+	# barra de vida do jogador (em baixo) — mais alta, texto centrado
 	var hp_bg := ColorRect.new()
 	hp_bg.color = Color(0, 0, 0, 0.55)
 	hp_bg.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	hp_bg.offset_left = 16
 	hp_bg.offset_right = -16
-	hp_bg.offset_top = -34
+	hp_bg.offset_top = -46
 	hp_bg.offset_bottom = -16
 	hud_root.add_child(hp_bg)
 	hp_fill = ColorRect.new()
 	hp_fill.color = Color("6dd36a")
-	# A largura é a fração de vida: em vez de mexer no size (que os anchors
-	# não-iguais-opostos anulam), controlamos a borda direita via anchor_right.
-	hp_fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hp_fill.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	hp_fill.offset_top = 0
+	hp_fill.offset_bottom = 0
+	hp_fill.size = Vector2(200, 30)
 	hp_bg.add_child(hp_fill)
 	hp_label = Label.new()
-	hp_label.add_theme_font_size_override("font_size", 11)
-	hp_label.position = Vector2(6, -1)
+	hp_label.add_theme_font_size_override("font_size", 15)
+	hp_label.add_theme_color_override("font_color", Color.WHITE)
+	hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.75))
+	hp_label.add_theme_constant_override("shadow_offset_x", 1)
+	hp_label.add_theme_constant_override("shadow_offset_y", 1)
+	hp_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hp_bg.add_child(hp_label)
-
-	hud_gear = Label.new()
-	hud_gear.add_theme_font_size_override("font_size", 11)
-	hud_gear.add_theme_color_override("font_color", Color("f4c145"))
-	hud_gear.position = Vector2(16, -56)
-	hud_gear.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	hud_gear.offset_top = -56
-	hud_root.add_child(hud_gear)
 
 	# banner central
 	banner_box = VBoxContainer.new()
@@ -289,6 +327,54 @@ func _build_hud() -> void:
 	banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner_box.add_child(banner_sub)
 
+	# controlos táteis — só aparecem em ecrãs de toque (ou com FORCE_ON_DESKTOP)
+	if Touch.enabled:
+		_build_touch_controls()
+
+func _build_touch_controls() -> void:
+	const BOTTOM := 64.0   # acima da barra de vida (34px) com folga
+	var joy := HudJoystick.new()
+	_anchor_bottom(joy, 30.0, 120.0, 120.0, BOTTOM, false)
+	hud_root.add_child(joy)
+
+	var atk := HudTouchButton.new()
+	atk.label = "ATACAR"
+	atk.target = "attack"
+	atk.color = Color("d1453b")
+	_anchor_bottom(atk, 30.0, 68.0, 68.0, BOTTOM, true)
+	hud_root.add_child(atk)
+
+	var dash := HudTouchButton.new()
+	dash.label = "DASH"
+	dash.target = "dash"
+	dash.color = Color("4fd6c9")
+	_anchor_bottom(dash, 114.0, 68.0, 68.0, BOTTOM + 40.0, true)
+	hud_root.add_child(dash)
+
+# Posiciona um Control encostado ao fundo, a 'x' da esquerda ou da direita.
+func _anchor_bottom(ctrl: Control, x: float, w: float, h: float, bottom: float, from_right: bool) -> void:
+	if from_right:
+		ctrl.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		ctrl.offset_left = -(x + w)
+		ctrl.offset_right = -x
+	else:
+		ctrl.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		ctrl.offset_left = x
+		ctrl.offset_right = x + w
+	ctrl.offset_top = -(bottom + h)
+	ctrl.offset_bottom = -bottom
+
+func _hud_label(txt: String, sz: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", sz)
+	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 1)
+	return l
+
 func _start_game() -> void:
 	creation_root.visible = false
 	hud_root.visible = true
@@ -298,8 +384,8 @@ func _start_game() -> void:
 func _on_alive_changed(n: int) -> void:
 	hud_alive.text = "Vivos: %d" % n
 
-func _on_phase_changed(phase_name: String) -> void:
-	hud_phase.text = "Fase: %s" % phase_name
+func _on_phase_changed(name: String) -> void:
+	hud_phase.text = "Fase: %s" % name
 
 func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_big.text = big

@@ -71,12 +71,12 @@ func _draw() -> void:
 	if is_titan:
 		draw_circle(Vector2.ZERO, s * 1.6, Color(0.61, 0.42, 1.0, 0.18))
 	if is_zombie:
-		draw_arc(Vector2.ZERO, s * 1.25, 0, TAU, 24, Color(0.48, 0.78, 0.31, 0.5), 1.5)
+		draw_arc(Vector2.ZERO, s * 1.25, 0, TAU, 12, Color(0.48, 0.78, 0.31, 0.5), 1.5)
 	if is_player():
-		draw_arc(Vector2.ZERO, s * 1.5, 0, TAU, 28, Color("f4c145"), 2.5)
+		draw_arc(Vector2.ZERO, s * 1.5, 0, TAU, 16, Color("f4c145"), 2.5)
 	# corpo
 	draw_circle(Vector2.ZERO, s, Color.WHITE if flash > 0.0 else color)
-	draw_arc(Vector2.ZERO, s, 0, TAU, 28, Color(0, 0, 0, 0.5), 1.2)
+	draw_arc(Vector2.ZERO, s, 0, TAU, 14, Color(0, 0, 0, 0.5), 1.2)
 	# barra de vida por cima (só nos que não são o jogador — esse vê no HUD)
 	if not is_player():
 		var bw: float = max(s * 2.2, 16.0)

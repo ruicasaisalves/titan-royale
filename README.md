@@ -58,6 +58,33 @@ scripts/
   Main.gd                UI (criação + HUD) e ligação de tudo
 ```
 
+## Controlos táteis (Android)
+Em ecrãs de toque aparecem automaticamente um **joystick** (esquerda) e os
+botões **ATACAR** / **DASH** (direita). São multi-touch a sério — cada widget
+segue o *seu* dedo pelo índice de toque — por isso podes mover e atacar ao
+mesmo tempo. Para os testar no PC com o rato, põe `FORCE_ON_DESKTOP = true`
+em `scripts/TouchInput.gd`.
+
+Ficheiros: `TouchInput.gd` (autoload `Touch`, estado partilhado),
+`HudJoystick.gd`, `HudTouchButton.gd`. O `PlayerController` junta teclado,
+rato e toque numa única `Intent` — a simulação não sabe de onde veio o input.
+
+## Exportar para Android (passos)
+1. **Editor → Manage Export Templates** → *Download and Install* (os templates
+   têm de ser da **mesma versão** do editor).
+2. Instala o **JDK 17** (o Godot 4 exige o 17 — com o 21 dá erro) e o
+   **Android SDK** (command-line tools). No Godot: *Editor → Editor Settings →
+   Export → Android* e aponta o *Java SDK Path* e o *Android SDK Path*.
+3. Cria um **keystore** de debug (*Editor Settings → Export → Android →
+   Debug Keystore*) — para testar no teu telemóvel chega.
+4. **Project → Export → Add… → Android**, exporta um **APK** e instala-o no
+   telemóvel (`adb install` ou copiar o ficheiro).
+5. Para a Google Play: keystore de *release*, exportar **AAB**, e conta de
+   programador (25 USD, uma vez).
+
+Se o export aparecer cinzento ou der um erro de Gradle, é quase sempre
+uma das três versões desalinhadas: editor, templates ou JDK.
+
 ## Próximos passos sugeridos
 - Dar aos ranged (Arqueiro/Necromante) um **projétil** real em vez de golpe instantâneo.
 - Sprites/animações: trocar o `_draw()` do `Fighter` por um `AnimatedSprite2D`.
