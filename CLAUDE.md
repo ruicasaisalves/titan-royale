@@ -110,7 +110,20 @@ Portuguese-comment / English-identifier rule, which still applies to code.
 
 ### Rendering
 
-Fighters and items draw themselves via `_draw()` (`scripts/Fighter.gd`, `scripts/Item.gd`) — there are
-no sprites/animations yet; `queue_redraw()` is called explicitly each tick from `Arena`. Swapping in
-real sprites means replacing these `_draw()` calls with `AnimatedSprite2D` nodes, not touching the
-simulation logic.
+Items still draw themselves via `_draw()` (`scripts/Item.gd`); `queue_redraw()` is called explicitly
+each tick from `Arena`.
+
+Fighters render with an `AnimatedSprite2D` built in code from a per-class pixel-art sheet in
+`assets/fighters/<cls>.png` (7 classes + `Zombie.png`). Each sheet is an 8×17 grid of 100×40 cells;
+`Fighter._get_frames()` slices named animations (idle/run/attack/cast/dash/die) defined in
+`Fighter.ANIMS` and caches one `SpriteFrames` per class (shared across all fighters). `Fighter._process()`
+picks the animation from state (`moving`, `dash_timer`, an attack pulse via `play_attack()`), flips by
+`facing`, scales by `size` (so ×10 titans scale up), and tints zombies green / flashes white on hit.
+`Arena._apply_movement` sets `moving`/`facing`; the attack loop calls `play_attack()`. `Fighter._draw()`
+now only paints the shadow, auras/rings, HP bar and player name over the sprite (the sprite uses
+`show_behind_parent`); the old circle body remains solely as a fallback when a sheet is missing.
+
+The sheets are composed from the purchased **Heroes99** pack (not in the repo) by
+`tools/compose_fighters.py` — edit its `CLASSES` table (cloth/hair/weapon/color per class) and re-run
+`python3 tools/compose_fighters.py <path-to-Heroes99_v1.2>` to regenerate. Weapon ids: 1=sword,
+2=axe, 3=dagger, 4=spear, 5=wand.
