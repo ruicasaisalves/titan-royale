@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.031c`).
+scheme is `0.0XX` + a letter suffix (current: `0.031d`).
 
 ## Running the project
 
