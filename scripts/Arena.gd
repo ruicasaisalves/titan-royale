@@ -176,6 +176,7 @@ func _combat_step(delta: float) -> void:
 		if intents[f].attack and f.cd_timer <= 0.0:
 			f.cd_timer = f.cd
 			_do_attack(f)
+			f.play_attack()
 	# regen + timers + redesenho
 	for f in fighters:
 		if not f.alive:
@@ -200,6 +201,10 @@ func _apply_movement(f, it: Intent, delta: float) -> void:
 		f.dash_timer = 0.16
 	var boost: float = 3.2 if f.dash_timer > 0.0 else 1.0
 	f.position += it.move * f.speed * boost * delta
+	# estado para a animação (direção e se está a mover-se)
+	f.moving = it.move.length() > 0.01
+	if absf(it.move.x) > 0.05:
+		f.facing = 1 if it.move.x > 0.0 else -1
 	if f.dash_timer > 0.0:
 		f.dash_timer -= delta
 	if f.dash_cd > 0.0:

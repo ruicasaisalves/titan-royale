@@ -11,6 +11,10 @@ var controller: Controller = null
 var color: Color = Color.WHITE
 var display_name: String = ""
 
+# direção/estado usados pela animação (a Arena preenche-os no tick)
+var facing: int = 1            # 1 = direita, -1 = esquerda
+var moving: bool = false
+
 var max_hp: float = 100.0
 var hp: float = 100.0
 var atk: float = 10.0
@@ -45,6 +49,98 @@ var amulet_heal_timer: float = 0.0
 
 var flash: float = 0.0
 
+# ---------- animação (sprites do pack Heroes99) ----------
+# Folha por classe em res://assets/fighters/<cls>.png, grelha 8x17 (célula 100x40).
+# Cada animação: [linha, coluna_inicial, n_frames, fps, loop].
+const SHEET_DIR := "res://assets/fighters/"
+const CELL_W := 100
+const CELL_H := 40
+const ART_H := 26.0            # altura aproximada da figura dentro da célula
+const CHAR_H_MULT := 3.2       # altura da figura no ecrã ≈ size * este fator
+const ANIMS := {
+	"idle":   [0, 0, 6, 8.0, true],
+	"run":    [2, 0, 8, 12.0, true],
+	"attack": [5, 0, 6, 14.0, false],
+	"cast":   [10, 0, 5, 12.0, false],
+	"dash":   [14, 0, 8, 16.0, true],
+	"die":    [13, 0, 5, 10.0, false],
+}
+# SpriteFrames partilhado por classe (construído uma vez, reutilizado por todos).
+static var _frames_cache: Dictionary = {}
+var _sprite: AnimatedSprite2D = null
+var _attack_name: String = "attack"
+var _attack_t: float = 0.0
+
+func _ready() -> void:
+	var frames := _get_frames(cls)
+	if frames == null:
+		return
+	_sprite = AnimatedSprite2D.new()
+	_sprite.sprite_frames = frames
+	_sprite.show_behind_parent = true   # corpo por baixo do _draw (barra de vida, aros)
+	_sprite.centered = true
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # pixel art nítida
+	add_child(_sprite)
+	# magos brandem cajado (animação de "casting"); os restantes golpeiam
+	_attack_name = "cast" if cls in ["Necromante", "Sacerdote"] else "attack"
+	_sprite.play("idle")
+
+func _process(delta: float) -> void:
+	if _sprite == null:
+		return
+	# escala acompanha o size (os titãs crescem ×10)
+	var k: float = size * CHAR_H_MULT / ART_H
+	_sprite.scale = Vector2(k, k)
+	_sprite.flip_h = facing < 0
+	# tint: esverdeado para zombies, clarão branco ao levar dano
+	var mod: Color = Color(0.55, 0.85, 0.45) if is_zombie else Color.WHITE
+	if flash > 0.0:
+		mod = Color(1.7, 1.7, 1.7)
+	_sprite.modulate = mod
+	# escolha da animação: ataque > dash > correr > parado
+	if _attack_t > 0.0:
+		_attack_t -= delta
+	elif dash_timer > 0.0:
+		if _sprite.animation != "dash":
+			_sprite.play("dash")
+	else:
+		var want: String = "run" if moving else "idle"
+		if _sprite.animation != want:
+			_sprite.play(want)
+
+# Chamado pela Arena quando o lutador desfere um ataque.
+func play_attack() -> void:
+	if _sprite == null:
+		return
+	var d: Array = ANIMS[_attack_name]
+	_attack_t = float(d[2]) / float(d[3])
+	_sprite.play(_attack_name)
+
+func _get_frames(key: String) -> SpriteFrames:
+	if key == "":
+		return null
+	if _frames_cache.has(key):
+		return _frames_cache[key]
+	var path: String = SHEET_DIR + key + ".png"
+	if not ResourceLoader.exists(path):
+		_frames_cache[key] = null
+		return null
+	var tex: Texture2D = load(path)
+	var sf := SpriteFrames.new()
+	sf.remove_animation("default")
+	for name in ANIMS:
+		var d: Array = ANIMS[name]
+		sf.add_animation(name)
+		sf.set_animation_speed(name, d[3])
+		sf.set_animation_loop(name, d[4])
+		for i in range(d[2]):
+			var at := AtlasTexture.new()
+			at.atlas = tex
+			at.region = Rect2((d[1] + i) * CELL_W, d[0] * CELL_H, CELL_W, CELL_H)
+			sf.add_frame(name, at)
+	_frames_cache[key] = sf
+	return sf
+
 func atk_mult() -> float:
 	var s: float = 0.0
 	for w in weapons:
@@ -74,9 +170,10 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, s * 1.25, 0, TAU, 12, Color(0.48, 0.78, 0.31, 0.5), 1.5)
 	if is_player():
 		draw_arc(Vector2.ZERO, s * 1.5, 0, TAU, 16, Color("f4c145"), 2.5)
-	# corpo
-	draw_circle(Vector2.ZERO, s, Color.WHITE if flash > 0.0 else color)
-	draw_arc(Vector2.ZERO, s, 0, TAU, 14, Color(0, 0, 0, 0.5), 1.2)
+	# corpo: só quando não há sprite (fallback sem os assets)
+	if _sprite == null:
+		draw_circle(Vector2.ZERO, s, Color.WHITE if flash > 0.0 else color)
+		draw_arc(Vector2.ZERO, s, 0, TAU, 14, Color(0, 0, 0, 0.5), 1.2)
 	# barra de vida por cima (só nos que não são o jogador — esse vê no HUD)
 	if not is_player():
 		var bw: float = max(s * 2.2, 16.0)
