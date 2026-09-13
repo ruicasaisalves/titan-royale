@@ -12,7 +12,11 @@ func decide(f, arena) -> Intent:
 		return intent
 	var to: Vector2 = target.position - f.position
 	var dist: float = to.length()
-	if dist > f.attack_range:
+	# alcance medido borda-a-borda: o attack_range é o "comprimento da arma"
+	# somado aos raios dos dois corpos. Sem isto, os corpo-a-corpo só
+	# acertavam num alvo encurralado (e os titãs mal se alcançavam).
+	var reach: float = f.attack_range + f.size + target.size
+	if dist > reach:
 		intent.move = to / max(dist, 0.001)
 	else:
 		intent.attack = true

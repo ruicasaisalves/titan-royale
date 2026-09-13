@@ -223,13 +223,12 @@ func _separate(f) -> void:
 
 func _do_attack(f) -> void:
 	if f.is_player():
-		# golpe em arco: acerta em todos os inimigos ao alcance
-		var reach: float = f.attack_range + f.size * 2.0
-		var near: Array = grid.query(f.position, reach + 24.0)
+		# golpe em arco: acerta em todos os inimigos ao alcance (borda-a-borda)
+		var near: Array = grid.query(f.position, f.attack_range + f.size + 60.0)
 		for o in near:
 			if o == f or not o.alive or o.team == f.team:
 				continue
-			if f.position.distance_to(o.position) <= reach:
+			if f.position.distance_to(o.position) <= f.attack_range + f.size + o.size:
 				_apply_hit(f, o)
 	else:
 		if f.target != null and f.target.alive and f.target.team != f.team:
