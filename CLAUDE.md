@@ -17,6 +17,10 @@ identifiers in English, unless the user asks otherwise.
 There is no build system, package manager, linter, or test suite in this repo — it's a pure Godot
 project. There is nothing to install/build/lint/test from the CLI.
 
+**Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
+`version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
+scheme is `0.0XX` + a letter suffix (current: `0.031a`).
+
 ## Running the project
 
 1. Install Godot 4.2+.
