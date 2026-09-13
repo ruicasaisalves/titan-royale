@@ -62,7 +62,7 @@ func setup(cfg: Dictionary) -> void:
 		var cls: String = class_names[randi() % class_names.size()]
 		_add_fighter(_make_fighter(cls))
 	running = true
-	phase_changed.emit("Royale")
+	phase_changed.emit(Loc.t("phase_royale"))
 	alive_changed.emit(contenders_alive().size())
 
 func _add_fighter(f) -> void:
@@ -106,7 +106,7 @@ func _make_player(cfg: Dictionary) -> Fighter:
 	f.cd = max(0.27, a["cd"] * 0.6)
 	f.size = max(9.0, a["size"])
 	f.color = cfg["color"]
-	f.display_name = cfg["name"] if cfg["name"] != "" else "TU"
+	f.display_name = cfg["name"] if cfg["name"] != "" else Loc.t("default_name")
 	f.position = world_size / 2.0
 	return f
 
@@ -191,7 +191,7 @@ func _combat_step(delta: float) -> void:
 	# morte do jogador
 	if player != null and _player_prev_alive and not player.alive:
 		var place: int = contenders_alive().size() + 1
-		show_banner.emit("Eliminado", "Ficaste em #%d" % place, true)
+		show_banner.emit(Loc.t("banner_eliminated_big"), Loc.t("banner_eliminated_sub", [place]), true)
 	_player_prev_alive = (player != null and player.alive)
 
 func _apply_movement(f, it: Intent, delta: float) -> void:
@@ -325,7 +325,7 @@ func _check_top6() -> void:
 	if contenders_alive().size() <= 6:
 		phase = Phase.TRANSITION
 		transition_timer = 1.2
-		show_banner.emit("Top 6", "A arena desperta...", false)
+		show_banner.emit(Loc.t("banner_top6_big"), Loc.t("banner_top6_sub"), false)
 
 func _transition_step(delta: float) -> void:
 	transition_timer -= delta
@@ -361,7 +361,7 @@ func _start_titans() -> void:
 		f.cd_timer = randf_range(0.0, f.cd)
 	phase = Phase.TITAN
 	arena_tint = 1.0
-	phase_changed.emit("Titas")
+	phase_changed.emit(Loc.t("phase_titans"))
 
 func _check_victory() -> void:
 	if contenders_alive().size() <= 1:
@@ -370,9 +370,9 @@ func _check_victory() -> void:
 		var alive_c: Array = contenders_alive()
 		var w = alive_c[0] if alive_c.size() == 1 else null
 		if w != null and w.is_player():
-			show_banner.emit("VITORIA", "%s e o ultimo tita!" % w.display_name, false)
+			show_banner.emit(Loc.t("banner_victory_big"), Loc.t("banner_victory_sub", [w.display_name]), false)
 		else:
-			show_banner.emit("Fim", ("%s venceu" % w.cls) if w != null else "-", false)
+			show_banner.emit(Loc.t("banner_end_big"), Loc.t("banner_end_sub", [Arch.disp(w.cls)]) if w != null else "-", false)
 
 # ---------- utilitários ----------
 func contenders_alive() -> Array:

@@ -14,6 +14,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+Loc="*res://scripts/Loc.gd"
 Arch="*res://scripts/Archetypes.gd"
 Touch="*res://scripts/TouchInput.gd"
 

@@ -52,7 +52,7 @@ func _process(_delta: float) -> void:
 	if hud_root.visible and arena.player != null and arena.player.alive:
 		var p = arena.player
 		hp_fill.size.x = hp_fill.get_parent().size.x * clamp(p.hp / p.max_hp, 0.0, 1.0)
-		hp_label.text = "%s  ·  %s" % [p.display_name, p.cls]
+		hp_label.text = "%s  ·  %s" % [p.display_name, Arch.disp(p.cls)]
 		hud_gear.text = _gear_text(p)
 
 func _gear_text(p) -> String:
@@ -61,16 +61,16 @@ func _gear_text(p) -> String:
 		var sum := 0
 		for w in p.weapons:
 			sum += int(w)
-		s += "Armas x%d (+%d%%)  " % [p.weapons.size(), sum]
+		s += Loc.t("gear_weapons", [p.weapons.size(), sum])
 	if p.has_armor:
-		s += "Armadura  "
+		s += Loc.t("gear_armor")
 	var h := 0
 	var cr := 0
 	for a in p.amulets:
 		if a == "heal": h += 1
 		else: cr += 1
-	if h > 0: s += "Cura x%d  " % h
-	if cr > 0: s += "Crit x%d" % cr
+	if h > 0: s += Loc.t("gear_heal", [h])
+	if cr > 0: s += Loc.t("gear_crit", [cr])
 	return s
 
 # ============ ECRÃ DE CRIAÇÃO ============
@@ -122,7 +122,7 @@ func _build_creation() -> void:
 	cols.add_child(right)
 
 	# ---- coluna esquerda: classes ----
-	left.add_child(_title("1 · Escolhe a tua classe", 12, Color("8a8fa3")))
+	left.add_child(_title(Loc.t("creation_class_title"), 12, Color("8a8fa3")))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -130,7 +130,7 @@ func _build_creation() -> void:
 	left.add_child(grid)
 	for cls in Arch.names():
 		var b := Button.new()
-		b.text = cls
+		b.text = Arch.disp(cls)
 		b.custom_minimum_size = Vector2(140, 44)
 		b.pressed.connect(_select_class.bind(cls))
 		grid.add_child(b)
@@ -142,16 +142,16 @@ func _build_creation() -> void:
 	left.add_child(stats_label)
 
 	# ---- coluna direita: o teu lutador ----
-	right.add_child(_title("2 · O teu lutador", 12, Color("8a8fa3")))
+	right.add_child(_title(Loc.t("creation_fighter_title"), 12, Color("8a8fa3")))
 
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 10)
 	right.add_child(name_row)
 	var nlbl := Label.new()
-	nlbl.text = "Nome:"
+	nlbl.text = Loc.t("name_label")
 	name_row.add_child(nlbl)
 	var line := LineEdit.new()
-	line.placeholder_text = "Heroi sem nome"
+	line.placeholder_text = Loc.t("name_placeholder")
 	line.max_length = 14
 	line.custom_minimum_size = Vector2(220, 0)
 	line.text_changed.connect(func(t): cfg["name"] = t.strip_edges())
@@ -161,7 +161,7 @@ func _build_creation() -> void:
 	color_row.add_theme_constant_override("separation", 8)
 	right.add_child(color_row)
 	var clbl := Label.new()
-	clbl.text = "Cor:"
+	clbl.text = Loc.t("color_label")
 	color_row.add_child(clbl)
 	for hex in PALETTE:
 		var sw := ColorRect.new()
@@ -185,12 +185,11 @@ func _build_creation() -> void:
 	hint.add_theme_color_override("font_color", Color("8a8fa3"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size = Vector2(340, 0)
-	hint.text = ("Toque: joystick a esquerda, ATACAR / DASH a direita."
-		if Touch.enabled else "WASD/setas mover · espaco atacar · shift dash · ou arrasta o rato")
+	hint.text = Loc.t("hint_touch") if Touch.enabled else Loc.t("hint_keyboard")
 	right.add_child(hint)
 
 	var start := Button.new()
-	start.text = "ENTRAR NA ARENA"
+	start.text = Loc.t("enter_arena")
 	start.custom_minimum_size = Vector2(0, 50)
 	start.pressed.connect(_start_game)
 	right.add_child(start)
@@ -205,7 +204,7 @@ func _title(txt: String, sz: int, col: Color) -> Label:
 	return l
 
 func _point_row(key: String) -> HBoxContainer:
-	var labels := {"hp": "Vida", "atk": "Ataque", "def": "Defesa", "spd": "Velocidade"}
+	var labels := {"hp": Loc.t("stat_hp"), "atk": Loc.t("stat_atk"), "def": Loc.t("stat_def"), "spd": Loc.t("stat_spd")}
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var name_l := Label.new()
@@ -244,7 +243,7 @@ func _change_point(key: String, d: int) -> void:
 	_refresh_points()
 
 func _refresh_points() -> void:
-	points_left_label.text = "Pontos de stats — restam %d" % (TOTAL_POINTS - _points_used())
+	points_left_label.text = Loc.t("points_left", [TOTAL_POINTS - _points_used()])
 	for key in point_value_labels:
 		point_value_labels[key].text = str(cfg["points"][key])
 
@@ -258,9 +257,9 @@ func _select_class(cls: String) -> void:
 	for name in class_buttons:
 		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
 	var a: Dictionary = Arch.DATA[cls]
-	stats_label.text = "%s — %s\nVida %d · Ataque %d · Defesa %d · Vel %d · Alcance %d" % [
-		cls, a["role"], int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
-	]
+	stats_label.text = Loc.t("stats_line", [
+		Arch.disp(cls), Arch.role(cls), int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
+	])
 
 # ============ HUD ============
 func _build_hud() -> void:
@@ -277,9 +276,9 @@ func _build_hud() -> void:
 	top_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_box.add_theme_constant_override("separation", 2)
 	hud_root.add_child(top_box)
-	hud_alive = _hud_label("Vivos: %d" % (Arena.OPPONENTS + 1), 20, Color("ece5d3"))
+	hud_alive = _hud_label(Loc.t("hud_alive", [Arena.OPPONENTS + 1]), 20, Color("ece5d3"))
 	top_box.add_child(hud_alive)
-	hud_phase = _hud_label("Fase: Royale", 15, Color("8a8fa3"))
+	hud_phase = _hud_label(Loc.t("hud_phase", [Loc.t("phase_royale")]), 15, Color("8a8fa3"))
 	top_box.add_child(hud_phase)
 	hud_gear = _hud_label("", 14, Color("f4c145"))
 	top_box.add_child(hud_gear)
@@ -338,14 +337,14 @@ func _build_touch_controls() -> void:
 	hud_root.add_child(joy)
 
 	var atk := HudTouchButton.new()
-	atk.label = "ATACAR"
+	atk.label = Loc.t("btn_attack")
 	atk.target = "attack"
 	atk.color = Color("d1453b")
 	_anchor_bottom(atk, 30.0, 68.0, 68.0, BOTTOM, true)
 	hud_root.add_child(atk)
 
 	var dash := HudTouchButton.new()
-	dash.label = "DASH"
+	dash.label = Loc.t("btn_dash")
 	dash.target = "dash"
 	dash.color = Color("4fd6c9")
 	_anchor_bottom(dash, 114.0, 68.0, 68.0, BOTTOM + 40.0, true)
@@ -382,10 +381,10 @@ func _start_game() -> void:
 	arena.setup(cfg)
 
 func _on_alive_changed(n: int) -> void:
-	hud_alive.text = "Vivos: %d" % n
+	hud_alive.text = Loc.t("hud_alive", [n])
 
 func _on_phase_changed(name: String) -> void:
-	hud_phase.text = "Fase: %s" % name
+	hud_phase.text = Loc.t("hud_phase", [name])
 
 func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_big.text = big
@@ -393,7 +392,7 @@ func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_sub.text = sub
 	banner_box.visible = true
 	# banners transitórios desaparecem sozinhos; morte/vitória ficam
-	if not dead and big == "Top 6":
+	if not dead and big == Loc.t("banner_top6_big"):
 		await get_tree().create_timer(1.6).timeout
 		if arena.phase == Arena.Phase.TITAN or arena.phase == Arena.Phase.TRANSITION:
 			banner_box.visible = false
