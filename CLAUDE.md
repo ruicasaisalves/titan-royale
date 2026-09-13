@@ -87,11 +87,26 @@ that's the exception, not the pattern to copy).
 
 `scripts/Archetypes.gd` is an autoload singleton (`Arch`) holding the `DATA` dictionary of all 7
 classes' base stats (hp/atk/def/speed/range/cd/size/color) plus class-specific flags (`necro`,
-`regen`/`regen_every`). `Arena._make_fighter`/`_make_player`/`_make_zombie` derive actual fighter
+`regen`/`regen_every`). Each class's `name`/`role` are `{"pt": ..., "en": ...}` dicts (see
+Localization below); read them via `Arch.disp(cls)`/`Arch.role(cls)`, never `DATA[cls]["name"]`
+directly. The dictionary **keys** (`"Bruto"`, `"Assassino"`, ...) are the internal class identifiers
+used everywhere in code (`Fighter.cls`, `is_necro` checks, etc.) — they are not display strings, so
+don't localize them. `Arena._make_fighter`/`_make_player`/`_make_zombie` derive actual fighter
 instances from this data (with per-fighter jitter, player bonuses, or zombie stat fractions). To
 add/tune a class, edit `Archetypes.DATA`; to change how a class's flags translate into behavior, look
 at `_make_fighter` and the corresponding check in `Arena` (e.g. `is_necro` handling in `_apply_hit`,
 `regen_pct`/`regen_every` handling in `_regen`).
+
+### Localization (PT/EN)
+
+The game ships in Portuguese and English only. `scripts/Loc.gd` is an autoload singleton (`Loc`) that
+detects the system language once at startup (`OS.get_locale_language() == "pt"` → `"pt"`, everyone
+else → `"en"`) and exposes `Loc.lang` plus `Loc.t(key, args := [])`. Every player-facing string lives
+in `Loc.STRINGS` as a `{"pt": ..., "en": ...}` entry (class name/role strings live in
+`Archetypes.DATA` instead, keyed the same way). When adding or changing UI text, add a key to
+`Loc.STRINGS` and call `Loc.t(...)` — never hard-code a display string in `Main.gd`/`Arena.gd`. `%`
+formatting is done by passing `args` (e.g. `Loc.t("hud_alive", [n])`). This is distinct from the
+Portuguese-comment / English-identifier rule, which still applies to code.
 
 ### Rendering
 
