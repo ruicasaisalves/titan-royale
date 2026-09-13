@@ -131,3 +131,12 @@ The sheets are composed from the purchased **Heroes99** pack (not in the repo) b
 `tools/compose_fighters.py` — edit its `CLASSES` table (cloth/hair/weapon/color per class) and re-run
 `python3 tools/compose_fighters.py <path-to-Heroes99_v1.2>` to regenerate. Weapon ids: 1=sword,
 2=axe, 3=dagger, 4=spear, 5=wand.
+
+## Future ideas (not built yet)
+
+- **In-game character selector** (player picks skin/hair/cloth/weapon/colour). Preferred approach:
+  compose the Heroes99 layers at runtime in Godot rather than relying on external tools. Bake only the
+  human player's chosen layers into a single `SpriteFrames` on confirm (reusing the layer order in
+  `tools/compose_fighters.py`); keep the 99 AI on the pre-composed per-class sheets so performance
+  isn't hit. External helpers exist for previewing combos (yhkk's spritesheet tool, hyperdoxical's
+  unofficial character creator) but aren't needed for the in-engine version.
