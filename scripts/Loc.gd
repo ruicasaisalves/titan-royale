@@ -19,6 +19,8 @@ const STRINGS := {
 	"name_label": {"pt": "Nome:", "en": "Name:"},
 	"name_placeholder": {"pt": "Heroi sem nome", "en": "Nameless hero"},
 	"color_label": {"pt": "Cor:", "en": "Color:"},
+	"hair_label": {"pt": "Cabelo:", "en": "Hair:"},
+	"cloth_label": {"pt": "Roupa:", "en": "Clothes:"},
 	"hint_touch": {
 		"pt": "Toque: joystick a esquerda, ATACAR / DASH a direita.",
 		"en": "Touch: joystick on the left, ATTACK / DASH on the right.",

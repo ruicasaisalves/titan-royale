@@ -187,6 +187,10 @@ func _make_player(cfg: Dictionary) -> Fighter:
 	f.color = cfg["color"]
 	f.display_name = cfg["name"] if cfg["name"] != "" else Loc.t("default_name")
 	f.position = world_size / 2.0
+	# aparência escolhida no menu: compõe a folha do jogador em runtime
+	# (definir sheet_override ANTES do add_child em setup()).
+	if cfg.has("hair_c") and cfg.has("cloth_c"):
+		f.sheet_override = CharacterComposer.compose(cfg["cls"], int(cfg["hair_c"]), int(cfg["cloth_c"]))
 	return f
 
 func _make_zombie(victim, owner) -> Fighter:

@@ -13,7 +13,8 @@ var data := {
 	"games": 0,
 	"best_place": 999,
 	"coins": 0,
-	"upgrades": {},   # ex.: {"hp": 2} — reservado para a loja futura
+	"upgrades": {},      # ex.: {"hp": 2} — reservado para a loja futura
+	"appearance": {},    # por classe: {"Bruto": {"hair_c": 3, "cloth_c": 2}, ...}
 }
 
 func _ready() -> void:
