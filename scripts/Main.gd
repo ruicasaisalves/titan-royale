@@ -34,6 +34,9 @@ var hp_label: Label
 var banner_big: Label
 var banner_sub: Label
 var banner_box: Control
+var menu_btn: Button
+var coins_label: Label
+var stats_menu_label: Label
 
 func _ready() -> void:
 	arena = Arena.new()
@@ -41,6 +44,7 @@ func _ready() -> void:
 	arena.alive_changed.connect(_on_alive_changed)
 	arena.phase_changed.connect(_on_phase_changed)
 	arena.show_banner.connect(_on_banner)
+	arena.match_ended.connect(_on_match_ended)
 
 	ui = CanvasLayer.new()
 	add_child(ui)
@@ -106,6 +110,11 @@ func _build_creation() -> void:
 	var ver := _title("v" + str(ProjectSettings.get_setting("application/config/version", "0.0")), 11, Color("8a8fa3"))
 	ver.size_flags_vertical = Control.SIZE_SHRINK_END
 	title_row.add_child(ver)
+
+	# estatísticas do perfil persistente (vitórias/derrotas/moedas)
+	stats_menu_label = _title("", 13, Color("f4c145"))
+	vb.add_child(stats_menu_label)
+	_refresh_menu_stats()
 
 	# Duas colunas lado a lado (classes | lutador) para caber nos 600px
 	# de altura — uma coluna única com botões de toque ficava cortada.
@@ -328,6 +337,26 @@ func _build_hud() -> void:
 	banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner_box.add_child(banner_sub)
 
+	# moedas ganhas nesta partida (aparece no fim)
+	coins_label = Label.new()
+	coins_label.add_theme_font_size_override("font_size", 20)
+	coins_label.add_theme_color_override("font_color", Color("f4c145"))
+	coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coins_label.visible = false
+	banner_box.add_child(coins_label)
+
+	# botão de voltar ao menu — só aparece quando o jogo acaba (vitória/derrota)
+	var btn_wrap := CenterContainer.new()
+	btn_wrap.custom_minimum_size = Vector2(0, 30)  # folga acima do botão
+	banner_box.add_child(btn_wrap)
+	menu_btn = Button.new()
+	menu_btn.text = Loc.t("back_to_menu")
+	menu_btn.custom_minimum_size = Vector2(260, 54)
+	menu_btn.add_theme_font_size_override("font_size", 20)
+	menu_btn.pressed.connect(_return_to_menu)
+	menu_btn.visible = false
+	btn_wrap.add_child(menu_btn)
+
 	# controlos táteis — só aparecem em ecrãs de toque (ou com FORCE_ON_DESKTOP)
 	if Touch.enabled:
 		_build_touch_controls()
@@ -400,10 +429,10 @@ func _build_intro() -> void:
 	logo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	logo.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	logo.offset_left = 60
-	logo.offset_right = -60
-	logo.offset_top = 80
-	logo.offset_bottom = -80
+	logo.offset_left = 140
+	logo.offset_right = -140
+	logo.offset_top = 110
+	logo.offset_bottom = -110
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	intro_root.add_child(logo)
 
@@ -440,7 +469,34 @@ func _start_game() -> void:
 	creation_root.visible = false
 	hud_root.visible = true
 	banner_box.visible = false
+	menu_btn.visible = false
+	coins_label.visible = false
 	arena.setup(cfg)
+
+# Volta ao ecrã de criação e limpa a partida atual.
+func _return_to_menu() -> void:
+	arena.reset_to_idle()
+	hud_root.visible = false
+	banner_box.visible = false
+	menu_btn.visible = false
+	coins_label.visible = false
+	_refresh_menu_stats()
+	creation_root.visible = true
+
+# Fim de jogo: grava o resultado no perfil e mostra as moedas ganhas.
+func _on_match_ended(won: bool, _place: int, coins: int) -> void:
+	Save.record_match(won, _place, coins)
+	coins_label.text = Loc.t("coins_earned", [coins])
+	coins_label.visible = true
+
+func _refresh_menu_stats() -> void:
+	if stats_menu_label == null:
+		return
+	stats_menu_label.text = Loc.t("menu_stats", [
+		int(Save.data.get("wins", 0)),
+		int(Save.data.get("losses", 0)),
+		int(Save.data.get("coins", 0)),
+	])
 
 func _on_alive_changed(n: int) -> void:
 	hud_alive.text = Loc.t("hud_alive", [n])
@@ -453,6 +509,9 @@ func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_big.add_theme_color_override("font_color", Color("d1453b") if dead else Color("f4c145"))
 	banner_sub.text = sub
 	banner_box.visible = true
+	# fim de jogo (jogador eliminado ou partida terminada) -> mostra o botão
+	# de voltar ao menu, para se poder recomeçar; ganhe ou perca.
+	menu_btn.visible = dead or arena.phase == Arena.Phase.VICTORY
 	# banners transitórios desaparecem sozinhos; morte/vitória ficam
 	if not dead and big == Loc.t("banner_top6_big"):
 		await get_tree().create_timer(1.6).timeout

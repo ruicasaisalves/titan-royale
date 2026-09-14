@@ -15,8 +15,14 @@ signal alive_changed(n)
 signal phase_changed(name)
 signal player_hp_changed(pct)
 signal show_banner(big, sub, dead)
+signal match_ended(won, place, coins)   # fim de jogo do jogador (uma vez por partida)
 
 enum Phase { IDLE, MELEE, TRANSITION, TITAN, VICTORY }
+
+# Zoom da câmara na fase royale: o boneco aparece 2.5x maior e vê-se só
+# parte do mapa; a câmara segue o jogador. Nos titãs volta a 1.0 (arena
+# encolhida, todos visíveis) — daí os titãs manterem o tamanho de sempre.
+const STAGE1_ZOOM := 2.5
 
 const ZOMBIE_COLOR := Color("5f7a3a")
 # Adversários na fase royale. Baixado temporariamente de 99 para 25 para
@@ -37,6 +43,9 @@ var player: Fighter = null
 var popups: Array = []          # {pos, text, life, col}
 var running: bool = false
 var _player_prev_alive: bool = true
+var _result_recorded: bool = false   # garante 1 registo de resultado por partida
+var camera: Camera2D = null
+var screen_size := Vector2(960, 600)
 
 # Temas de chão (tiles seamless em assets/arena/): cada tema define o chão
 # da fase 1 (royale) e da fase 2 (titãs). Cada partida sorteia um tema.
@@ -51,9 +60,22 @@ var _floor_stage1: Texture2D = null
 var _floor_stage2: Texture2D = null
 
 func _ready() -> void:
-	world_size = get_viewport_rect().size
+	screen_size = get_viewport_rect().size
+	world_size = screen_size
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# câmara que segue o jogador (faz zoom na fase royale); a UI vive numa
+	# CanvasLayer, por isso não é afetada por este zoom/deslocamento.
+	camera = Camera2D.new()
+	camera.position_smoothing_enabled = true
+	camera.position_smoothing_speed = 6.0
+	camera.limit_left = 0
+	camera.limit_top = 0
+	camera.limit_right = int(world_size.x)
+	camera.limit_bottom = int(world_size.y)
+	add_child(camera)
+	camera.make_current()
+	camera.position = world_size / 2.0
 	_pick_floors()
 
 func _pick_floors() -> void:
@@ -77,6 +99,7 @@ func setup(cfg: Dictionary) -> void:
 	arena_tint = 0.0
 	item_timer = 0.0
 	_player_prev_alive = true
+	_result_recorded = false
 	phase = Phase.MELEE
 	player = _make_player(cfg)
 	_add_fighter(player)
@@ -85,12 +108,45 @@ func setup(cfg: Dictionary) -> void:
 		var cls: String = class_names[randi() % class_names.size()]
 		_add_fighter(_make_fighter(cls))
 	running = true
+	# fase royale: câmara com zoom a seguir o jogador
+	camera.zoom = Vector2(STAGE1_ZOOM, STAGE1_ZOOM)
+	camera.position = player.position
+	camera.reset_smoothing()
 	phase_changed.emit(Loc.t("phase_royale"))
 	alive_changed.emit(contenders_alive().size())
 
 func _add_fighter(f) -> void:
 	fighters.append(f)
 	add_child(f)
+
+# Para a simulação e limpa tudo — usado ao voltar ao menu principal.
+func reset_to_idle() -> void:
+	running = false
+	for f in fighters:
+		f.queue_free()
+	for it in items:
+		it.queue_free()
+	fighters.clear()
+	items.clear()
+	popups.clear()
+	player = null
+	phase = Phase.IDLE
+	arena_tint = 0.0
+	if camera != null:
+		camera.zoom = Vector2.ONE
+		camera.position = world_size / 2.0
+		camera.reset_smoothing()
+	queue_redraw()
+
+# Regista o resultado da partida do jogador (uma só vez por partida). As
+# moedas dependem da colocação, com bónus de vitória; o Main é que grava.
+func _record_result(won: bool, place: int) -> void:
+	if _result_recorded:
+		return
+	_result_recorded = true
+	var total: int = OPPONENTS + 1
+	var coins: int = 5 + max(0, total - place) * 3 + (60 if won else 0)
+	match_ended.emit(won, place, coins)
 
 func _make_fighter(cls: String, ctrl: Controller = null) -> Fighter:
 	var a: Dictionary = Arch.DATA[cls]
@@ -209,13 +265,18 @@ func _combat_step(delta: float) -> void:
 			f.flash -= delta
 		f.queue_redraw()
 
+	# câmara segue o jogador na fase royale (nos titãs fica centrada)
+	if phase == Phase.MELEE and player != null and player.alive:
+		camera.position = player.position
+
 	alive_changed.emit(contenders_alive().size())
 	if player != null and player.alive:
 		player_hp_changed.emit(clamp(player.hp / player.max_hp, 0.0, 1.0))
-	# morte do jogador
+	# morte do jogador -> banner + registo do resultado (derrota)
 	if player != null and _player_prev_alive and not player.alive:
 		var place: int = contenders_alive().size() + 1
 		show_banner.emit(Loc.t("banner_eliminated_big"), Loc.t("banner_eliminated_sub", [place]), true)
+		_record_result(false, place)
 	_player_prev_alive = (player != null and player.alive)
 
 func _apply_movement(f, it: Intent, delta: float) -> void:
@@ -388,6 +449,12 @@ func _start_titans() -> void:
 		f.cd_timer = randf_range(0.0, f.cd)
 	phase = Phase.TITAN
 	arena_tint = 1.0
+	# arena "encolhe" para o duelo final: câmara volta ao zoom 1 e centra,
+	# ficando todos os titãs visíveis (o seu tamanho mantém-se).
+	camera.position = world_size / 2.0
+	camera.reset_smoothing()
+	var tw := create_tween()
+	tw.tween_property(camera, "zoom", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
 	phase_changed.emit(Loc.t("phase_titans"))
 
 func _check_victory() -> void:
@@ -398,6 +465,7 @@ func _check_victory() -> void:
 		var w = alive_c[0] if alive_c.size() == 1 else null
 		if w != null and w.is_player():
 			show_banner.emit(Loc.t("banner_victory_big"), Loc.t("banner_victory_sub", [w.display_name]), false)
+			_record_result(true, 1)
 		else:
 			show_banner.emit(Loc.t("banner_end_big"), Loc.t("banner_end_sub", [Arch.disp(w.cls)]) if w != null else "-", false)
 
