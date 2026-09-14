@@ -70,9 +70,12 @@ static var _frames_cache: Dictionary = {}
 var _sprite: AnimatedSprite2D = null
 var _attack_name: String = "attack"
 var _attack_t: float = 0.0
+# Folha composta em runtime (só o jogador; a IA usa a folha da classe).
+# Tem de ser definida ANTES de add_child (antes de _ready correr).
+var sheet_override: Texture2D = null
 
 func _ready() -> void:
-	var frames := _get_frames(cls)
+	var frames: SpriteFrames = _frames_from_texture(sheet_override) if sheet_override != null else _get_frames(cls)
 	if frames == null:
 		return
 	_sprite = AnimatedSprite2D.new()
@@ -126,6 +129,15 @@ func _get_frames(key: String) -> SpriteFrames:
 		_frames_cache[key] = null
 		return null
 	var tex: Texture2D = load(path)
+	var sf := _frames_from_texture(tex)
+	_frames_cache[key] = sf
+	return sf
+
+# Constrói um SpriteFrames a partir de uma textura-folha (partilhada pela
+# classe ou composta em runtime para o jogador) fatiando as ANIMS.
+func _frames_from_texture(tex: Texture2D) -> SpriteFrames:
+	if tex == null:
+		return null
 	var sf := SpriteFrames.new()
 	sf.remove_animation("default")
 	for name in ANIMS:
@@ -138,7 +150,6 @@ func _get_frames(key: String) -> SpriteFrames:
 			at.atlas = tex
 			at.region = Rect2((d[1] + i) * CELL_W, d[0] * CELL_H, CELL_W, CELL_H)
 			sf.add_frame(name, at)
-	_frames_cache[key] = sf
 	return sf
 
 func atk_mult() -> float:

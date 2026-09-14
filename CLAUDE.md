@@ -171,6 +171,19 @@ The sheets are composed from the purchased **Heroes99** pack (not in the repo) b
 `python3 tools/compose_fighters.py <path-to-Heroes99_v1.2>` to regenerate. Weapon ids: 1=sword,
 2=axe, 3=dagger, 4=spear, 5=wand.
 
+**Player appearance (runtime composition).** The human player picks a **hair colour** and a **cloth
+colour** on the creation screen (per class; remembered in `Save`). Only the needed Heroes99 layers are
+committed at `assets/heroes_layers/<Class>/` (`skin`, `face`, `weapon_bot/top`, and
+`hair_bot/top_c<c>` + `cloth_bot/top_c<c>` for colours 1–8), extracted by
+`tools/extract_player_layers.py <path-to-Heroes99_v1.2>` (which also writes `palette.json` with an
+average colour per variant for the UI swatches). `CharacterComposer.compose(cls, hair_c, cloth_c)`
+(`scripts/CharacterComposer.gd`, static, cached) stacks those layers in the same z-order as
+`compose_fighters.py` into an 800×680 `ImageTexture`; `Arena._make_player` assigns it to
+`Fighter.sheet_override` **before** `add_child`, and `Fighter._frames_from_texture` slices it exactly
+like a class sheet. The 99 AI keep the pre-composed per-class sheets (no perf hit). If a class has no
+layers, `compose` returns `null` and the fighter falls back to its class sheet. Full skin/weapon
+selection is still a future extension.
+
 The startup logo is a pixel-art "TITAN ROYALE" wordmark at `assets/ui/logo.png` — a hand-made art
 asset supplied by the author (**not procedurally generated**; do not overwrite it). It is shown as an
 animated in-game intro: `Main._build_intro()` fades/pops it over a dark full-rect `Control` on
@@ -192,9 +205,8 @@ except `stone_floor.png`, the original. Themes: Castelo, Areia, Natureza, Lava, 
 
 ## Future ideas (not built yet)
 
-- **In-game character selector** (player picks skin/hair/cloth/weapon/colour). Preferred approach:
-  compose the Heroes99 layers at runtime in Godot rather than relying on external tools. Bake only the
-  human player's chosen layers into a single `SpriteFrames` on confirm (reusing the layer order in
-  `tools/compose_fighters.py`); keep the 99 AI on the pre-composed per-class sheets so performance
-  isn't hit. External helpers exist for previewing combos (yhkk's spritesheet tool, hyperdoxical's
-  unofficial character creator) but aren't needed for the in-engine version.
+- **In-game character selector.** Hair-colour and cloth-colour picking is **done** (runtime
+  composition — see "Player appearance" under Rendering). Still open: letting the player also choose
+  the skin tone, hair style and weapon (add more layers to `extract_player_layers.py` and swatch rows
+  to `Main`), and a future **store** that spends `Save.coins` on upgrades (apply in
+  `Arena._make_player`, persist in `Save.data["upgrades"]`).

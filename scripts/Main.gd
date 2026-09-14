@@ -4,12 +4,13 @@ extends Node2D
 # simples (sem tema) — a ideia é desenhá-la depois no editor.
 
 const TOTAL_POINTS := 6
-const PALETTE := ["f4c145", "d1453b", "4fd6c9", "9b6cff", "6dd36a", "e08a3c", "5a86b4", "ece5d3"]
 
 var cfg := {
 	"cls": "Bruto",
 	"name": "",
 	"color": Color("f4c145"),
+	"hair_c": 1,
+	"cloth_c": 1,
 	"points": {"hp": 0, "atk": 0, "def": 0, "spd": 0},
 }
 
@@ -22,8 +23,12 @@ var intro_root: Control
 # refs de UI
 var class_buttons := {}
 var stats_label: Label
-var color_preview: ColorRect
 var points_left_label: Label
+# seletor de estilo (aparência)
+var char_preview: TextureRect
+var hair_swatches := {}
+var cloth_swatches := {}
+var palette := {}   # cache de cores das amostras (chave "cls|kind|c")
 var point_value_labels := {}
 
 var hud_alive: Label
@@ -168,23 +173,22 @@ func _build_creation() -> void:
 	line.text_changed.connect(func(t): cfg["name"] = t.strip_edges())
 	name_row.add_child(line)
 
-	var color_row := HBoxContainer.new()
-	color_row.add_theme_constant_override("separation", 8)
-	right.add_child(color_row)
-	var clbl := Label.new()
-	clbl.text = Loc.t("color_label")
-	color_row.add_child(clbl)
-	for hex in PALETTE:
-		var sw := ColorRect.new()
-		sw.color = Color(hex)
-		sw.custom_minimum_size = Vector2(26, 26)
-		sw.mouse_filter = Control.MOUSE_FILTER_STOP
-		sw.gui_input.connect(func(e): _on_swatch(e, hex))
-		color_row.add_child(sw)
-	color_preview = ColorRect.new()
-	color_preview.color = cfg["color"]
-	color_preview.custom_minimum_size = Vector2(26, 26)
-	color_row.add_child(color_preview)
+	# ---- aparência: pré-visualização + cor do cabelo/roupa (por classe) ----
+	var appearance_row := HBoxContainer.new()
+	appearance_row.add_theme_constant_override("separation", 14)
+	right.add_child(appearance_row)
+
+	char_preview = TextureRect.new()
+	char_preview.custom_minimum_size = Vector2(150, 90)
+	char_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	char_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	appearance_row.add_child(char_preview)
+
+	var swatches_col := VBoxContainer.new()
+	swatches_col.add_theme_constant_override("separation", 6)
+	appearance_row.add_child(swatches_col)
+	swatches_col.add_child(_swatch_row(Loc.t("hair_label"), "hair"))
+	swatches_col.add_child(_swatch_row(Loc.t("cloth_label"), "cloth"))
 
 	points_left_label = Label.new()
 	right.add_child(points_left_label)
@@ -258,10 +262,77 @@ func _refresh_points() -> void:
 	for key in point_value_labels:
 		point_value_labels[key].text = str(cfg["points"][key])
 
-func _on_swatch(e: InputEvent, hex: String) -> void:
-	if e is InputEventMouseButton and e.pressed:
-		cfg["color"] = Color(hex)
-		color_preview.color = cfg["color"]
+# ---- aparência (cabelo/roupa) ----
+const COLORS := [1, 2, 3, 4, 5, 6, 7, 8]   # cores disponíveis (c1..c8)
+
+func _swatch_row(text: String, kind: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.custom_minimum_size = Vector2(58, 0)
+	row.add_child(lbl)
+	for c in COLORS:
+		var sw := ColorRect.new()
+		sw.custom_minimum_size = Vector2(24, 24)
+		sw.mouse_filter = Control.MOUSE_FILTER_STOP
+		var ci := int(c)
+		sw.gui_input.connect(func(e): _on_color_pick(e, kind, ci))
+		row.add_child(sw)
+		if kind == "hair":
+			hair_swatches[ci] = sw
+		else:
+			cloth_swatches[ci] = sw
+	return row
+
+func _on_color_pick(e: InputEvent, kind: String, c: int) -> void:
+	if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+		cfg["hair_c" if kind == "hair" else "cloth_c"] = c
+		_refresh_appearance()
+
+# Cor média (célula idle) da camada de topo — para pintar a amostra da UI.
+# Amostra as texturas em runtime (sem depender de ficheiros extra no export).
+func _layer_avg_color(cls: String, kind: String, c: int) -> Color:
+	var key := "%s|%s|%d" % [cls, kind, c]
+	if palette.has(key):
+		return palette[key]
+	var col := Color(0.5, 0.5, 0.5)
+	var p := "res://assets/heroes_layers/%s/%s_top_c%d.png" % [cls, kind, c]
+	if ResourceLoader.exists(p):
+		var tex: Texture2D = load(p)
+		var img: Image = tex.get_image() if tex != null else null
+		if img != null:
+			if img.is_compressed():
+				img.decompress()
+			var r := 0.0
+			var g := 0.0
+			var b := 0.0
+			var n := 0
+			for y in range(0, min(40, img.get_height())):
+				for x in range(0, min(100, img.get_width())):
+					var px := img.get_pixel(x, y)
+					if px.a > 0.3:
+						r += px.r
+						g += px.g
+						b += px.b
+						n += 1
+			if n > 0:
+				col = Color(r / n, g / n, b / n)
+	palette[key] = col   # cache
+	return col
+
+func _refresh_appearance() -> void:
+	var cls: String = cfg["cls"]
+	for c in hair_swatches:
+		hair_swatches[c].color = _layer_avg_color(cls, "hair", c)
+		hair_swatches[c].modulate = Color.WHITE if c == int(cfg["hair_c"]) else Color(1, 1, 1, 0.4)
+	for c in cloth_swatches:
+		cloth_swatches[c].color = _layer_avg_color(cls, "cloth", c)
+		cloth_swatches[c].modulate = Color.WHITE if c == int(cfg["cloth_c"]) else Color(1, 1, 1, 0.4)
+	# a cor de destaque (aros/nome) segue a roupa escolhida
+	cfg["color"] = _layer_avg_color(cls, "cloth", int(cfg["cloth_c"]))
+	if char_preview != null:
+		char_preview.texture = CharacterComposer.preview(cls, int(cfg["hair_c"]), int(cfg["cloth_c"]))
 
 func _select_class(cls: String) -> void:
 	cfg["cls"] = cls
@@ -271,6 +342,12 @@ func _select_class(cls: String) -> void:
 	stats_label.text = Loc.t("stats_line", [
 		Arch.disp(cls), Arch.role(cls), int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
 	])
+	# aparência guardada por classe (ou default)
+	var app: Dictionary = Save.data.get("appearance", {})
+	var saved = app.get(cls, {})
+	cfg["hair_c"] = int(saved.get("hair_c", 1)) if saved is Dictionary else 1
+	cfg["cloth_c"] = int(saved.get("cloth_c", 1)) if saved is Dictionary else 1
+	_refresh_appearance()
 
 # ============ HUD ============
 func _build_hud() -> void:
@@ -466,6 +543,11 @@ func _is_press(e: InputEvent) -> bool:
 		or (e is InputEventKey and e.pressed)
 
 func _start_game() -> void:
+	# guarda a aparência escolhida (por classe) no perfil
+	var app: Dictionary = Save.data.get("appearance", {})
+	app[cfg["cls"]] = {"hair_c": cfg["hair_c"], "cloth_c": cfg["cloth_c"]}
+	Save.data["appearance"] = app
+	Save.save_profile()
 	creation_root.visible = false
 	hud_root.visible = true
 	banner_box.visible = false
