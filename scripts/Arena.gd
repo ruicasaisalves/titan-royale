@@ -38,8 +38,13 @@ var popups: Array = []          # {pos, text, life, col}
 var running: bool = false
 var _player_prev_alive: bool = true
 
+var _floor_tex: Texture2D = null
+
 func _ready() -> void:
 	world_size = get_viewport_rect().size
+	_floor_tex = load("res://assets/arena/stone_floor.png")
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 # ---------- arranque ----------
 func setup(cfg: Dictionary) -> void:
@@ -409,8 +414,14 @@ func _update_popups(delta: float) -> void:
 # ---------- fundo da arena ----------
 func _draw() -> void:
 	var t: float = arena_tint
-	var floor_col: Color = Color(0.227, 0.184, 0.157).lerp(Color(0.078, 0.067, 0.133), t)
-	draw_rect(Rect2(Vector2.ZERO, world_size), floor_col)
+	# chão de pedra em mosaico (tileado); escurece/tinge na fase dos titãs
+	if _floor_tex != null:
+		draw_texture_rect(_floor_tex, Rect2(Vector2.ZERO, world_size), true)
+		if t > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, world_size), Color(0.078, 0.067, 0.133, 0.55 * t))
+	else:
+		var floor_col: Color = Color(0.227, 0.184, 0.157).lerp(Color(0.078, 0.067, 0.133), t)
+		draw_rect(Rect2(Vector2.ZERO, world_size), floor_col)
 	var ring: Color = Color("f4c145")
 	ring.a = 0.12 + 0.18 * t
 	draw_arc(world_size / 2.0, min(world_size.x, world_size.y) * 0.42, 0, TAU, 64, ring, 2.0)
