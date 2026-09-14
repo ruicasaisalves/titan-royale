@@ -17,6 +17,7 @@ var arena: Arena
 var ui: CanvasLayer
 var creation_root: Control
 var hud_root: Control
+var intro_root: Control
 
 # refs de UI
 var class_buttons := {}
@@ -45,6 +46,7 @@ func _ready() -> void:
 	add_child(ui)
 	_build_creation()
 	_build_hud()
+	_build_intro()
 	_select_class("Bruto")
 
 func _process(_delta: float) -> void:
@@ -373,6 +375,66 @@ func _hud_label(txt: String, sz: int, col: Color) -> Label:
 	l.add_theme_constant_override("shadow_offset_x", 1)
 	l.add_theme_constant_override("shadow_offset_y", 1)
 	return l
+
+# ============ LOGO DE ENTRADA ============
+# Mostra o logo "TITAN ROYALE" (pixel-art) por cima de tudo ao arrancar,
+# faz um "pop" a aparecer, segura, e desvanece para o ecrã de criação.
+# Um toque/tecla salta a intro.
+var _intro_tween: Tween
+
+func _build_intro() -> void:
+	intro_root = Control.new()
+	intro_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_root.mouse_filter = Control.MOUSE_FILTER_STOP  # apanha o toque para saltar
+	intro_root.gui_input.connect(func(e): if _is_press(e): _end_intro())
+	ui.add_child(intro_root)
+
+	var bg := ColorRect.new()
+	bg.color = Color(0.055, 0.063, 0.09)  # mesmo fundo do jogo / boot splash
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	intro_root.add_child(bg)
+
+	var logo := TextureRect.new()
+	logo.texture = load("res://assets/ui/logo.png")
+	logo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	logo.offset_left = 60
+	logo.offset_right = -60
+	logo.offset_top = 80
+	logo.offset_bottom = -80
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	intro_root.add_child(logo)
+
+	var vp := get_viewport_rect().size
+	logo.pivot_offset = vp / 2
+	logo.scale = Vector2(0.92, 0.92)
+	intro_root.modulate.a = 0.0
+	_intro_tween = create_tween()
+	_intro_tween.set_trans(Tween.TRANS_SINE)
+	_intro_tween.tween_property(intro_root, "modulate:a", 1.0, 0.5)
+	_intro_tween.parallel().tween_property(logo, "scale", Vector2.ONE, 0.6) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_intro_tween.tween_interval(1.3)
+	_intro_tween.tween_property(intro_root, "modulate:a", 0.0, 0.5)
+	_intro_tween.tween_callback(_end_intro)
+
+func _end_intro() -> void:
+	if _intro_tween != null and _intro_tween.is_valid():
+		_intro_tween.kill()
+	if is_instance_valid(intro_root):
+		intro_root.queue_free()
+	intro_root = null
+
+func _unhandled_input(event: InputEvent) -> void:
+	if intro_root != null and _is_press(event):
+		_end_intro()
+
+func _is_press(e: InputEvent) -> bool:
+	return (e is InputEventMouseButton and e.pressed) \
+		or (e is InputEventScreenTouch and e.pressed) \
+		or (e is InputEventKey and e.pressed)
 
 func _start_game() -> void:
 	creation_root.visible = false
