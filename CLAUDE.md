@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.031e`).
+scheme is `0.0XX` + a letter suffix (current: `0.031f`).
 
 ## Running the project
 
@@ -131,6 +131,12 @@ The sheets are composed from the purchased **Heroes99** pack (not in the repo) b
 `tools/compose_fighters.py` — edit its `CLASSES` table (cloth/hair/weapon/color per class) and re-run
 `python3 tools/compose_fighters.py <path-to-Heroes99_v1.2>` to regenerate. Weapon ids: 1=sword,
 2=axe, 3=dagger, 4=spear, 5=wand.
+
+The arena floor is a seamless 64×64 tile from `assets/arena/` (`FLOOR_TILES` in `Arena.gd`). Each
+match, `Arena._pick_floors()` randomly picks one floor for stage 1 (royale) and one for stage 2
+(titans); `_draw()` tiles the current phase's floor under the ring/fighters. The tiles are generated
+procedurally by `tools/gen_floors.py` (run it to regenerate/add tiles) — except `stone_floor.png`,
+the original. Future: group tiles by theme for the two stages.
 
 ## Future ideas (not built yet)
 
