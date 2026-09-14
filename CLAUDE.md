@@ -148,10 +148,17 @@ The sheets are composed from the purchased **Heroes99** pack (not in the repo) b
 2=axe, 3=dagger, 4=spear, 5=wand.
 
 The startup logo is a pixel-art "TITAN ROYALE" wordmark at `assets/ui/logo.png` — a hand-made art
-asset supplied by the author (**not procedurally generated**; do not overwrite it). It is set as the
-engine **boot splash** (`application/boot_splash/*` in `project.godot`, replacing the Godot logo) and
-is also shown as an animated in-game intro: `Main._build_intro()` fades/pops it over a dark full-rect
-`Control` on startup, then fades to the creation screen (a tap/key skips it via `_end_intro()`).
+asset supplied by the author (**not procedurally generated**; do not overwrite it). It is shown as an
+animated in-game intro: `Main._build_intro()` fades/pops it over a dark full-rect `Control` on
+startup, then fades to the creation screen (a tap/key skips it via `_end_intro()`). The engine **boot
+splash** (`application/boot_splash/*` in `project.godot`, replacing the Godot logo) uses a separate
+composite `assets/ui/boot_splash.png` — the logo centered, smaller, on the dark background — built by
+`tools/gen_boot_splash.py` (re-run it if `logo.png` changes); it is shown at native size, centered
+(`boot_splash/fullsize=false`).
+
+When a match ends (player eliminated, or the arena resolves to a winner), `Main._on_banner` reveals a
+**"Main menu"** button in the banner box; pressing it calls `Main._return_to_menu()`, which stops and
+clears the sim via `Arena.reset_to_idle()` and shows the creation screen again for a fresh game.
 
 The arena floor uses seamless 64×64 tiles from `assets/arena/`, grouped into themes by
 `FLOOR_THEMES` in `Arena.gd` (each theme = `[stage1_royale, stage2_titans]`). Each match

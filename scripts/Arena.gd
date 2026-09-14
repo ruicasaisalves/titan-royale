@@ -92,6 +92,21 @@ func _add_fighter(f) -> void:
 	fighters.append(f)
 	add_child(f)
 
+# Para a simulação e limpa tudo — usado ao voltar ao menu principal.
+func reset_to_idle() -> void:
+	running = false
+	for f in fighters:
+		f.queue_free()
+	for it in items:
+		it.queue_free()
+	fighters.clear()
+	items.clear()
+	popups.clear()
+	player = null
+	phase = Phase.IDLE
+	arena_tint = 0.0
+	queue_redraw()
+
 func _make_fighter(cls: String, ctrl: Controller = null) -> Fighter:
 	var a: Dictionary = Arch.DATA[cls]
 	var f := Fighter.new()

@@ -28,6 +28,7 @@ const STRINGS := {
 		"en": "WASD/arrows move · space attack · shift dash · or drag the mouse",
 	},
 	"enter_arena": {"pt": "ENTRAR NA ARENA", "en": "ENTER THE ARENA"},
+	"back_to_menu": {"pt": "MENU PRINCIPAL", "en": "MAIN MENU"},
 
 	# ---- stats ----
 	"stat_hp": {"pt": "Vida", "en": "Health"},
