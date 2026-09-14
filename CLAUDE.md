@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.031g`).
+scheme is `0.0XX` + a letter suffix (current: `0.031h`).
 
 ## Running the project
 
@@ -136,7 +136,7 @@ The arena floor uses seamless 64×64 tiles from `assets/arena/`, grouped into th
 `FLOOR_THEMES` in `Arena.gd` (each theme = `[stage1_royale, stage2_titans]`). Each match
 `Arena._pick_floors()` picks a random theme; `_draw()` tiles the current phase's floor under the
 ring/fighters. Tiles are generated procedurally by `tools/gen_floors.py` (run it to regenerate/add) —
-except `stone_floor.png`, the original. Themes: Castelo, Areia, Natureza (Lava/Mágico planned).
+except `stone_floor.png`, the original. Themes: Castelo, Areia, Natureza, Lava, Mágico.
 
 ## Future ideas (not built yet)
 

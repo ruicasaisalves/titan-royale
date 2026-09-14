@@ -44,6 +44,8 @@ const FLOOR_THEMES := {
 	"Castelo": ["stone_floor", "plaza_grey"],
 	"Areia": ["sand_light", "sand_gold"],
 	"Natureza": ["grass", "grass_dark"],
+	"Lava": ["lava_1", "lava_2"],
+	"Magico": ["magic_1", "magic_2"],
 }
 var _floor_stage1: Texture2D = null
 var _floor_stage2: Texture2D = null
