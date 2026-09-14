@@ -38,16 +38,28 @@ var popups: Array = []          # {pos, text, life, col}
 var running: bool = false
 var _player_prev_alive: bool = true
 
-var _floor_tex: Texture2D = null
+# Biblioteca de chãos (tiles seamless em assets/arena/). No futuro podem
+# agrupar-se por tema; por agora cada partida sorteia um chão para a royale
+# (fase 1) e outro para a fase dos titãs (fase 2).
+const FLOOR_TILES := ["stone_floor", "plaza_grey", "sand_light", "sand_gold", "grass", "grass_dark"]
+var _floor_stage1: Texture2D = null
+var _floor_stage2: Texture2D = null
 
 func _ready() -> void:
 	world_size = get_viewport_rect().size
-	_floor_tex = load("res://assets/arena/stone_floor.png")
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_pick_floors()
+
+func _pick_floors() -> void:
+	var names: Array = FLOOR_TILES.duplicate()
+	names.shuffle()
+	_floor_stage1 = load("res://assets/arena/%s.png" % names[0])
+	_floor_stage2 = load("res://assets/arena/%s.png" % names[1])
 
 # ---------- arranque ----------
 func setup(cfg: Dictionary) -> void:
+	_pick_floors()   # novo chão sorteado a cada partida
 	for f in fighters:
 		f.queue_free()
 	for it in items:
@@ -414,11 +426,12 @@ func _update_popups(delta: float) -> void:
 # ---------- fundo da arena ----------
 func _draw() -> void:
 	var t: float = arena_tint
-	# chão de pedra em mosaico (tileado); escurece/tinge na fase dos titãs
-	if _floor_tex != null:
-		draw_texture_rect(_floor_tex, Rect2(Vector2.ZERO, world_size), true)
-		if t > 0.0:
-			draw_rect(Rect2(Vector2.ZERO, world_size), Color(0.078, 0.067, 0.133, 0.55 * t))
+	# chão em mosaico: fase 1 (royale) ou fase 2 (titãs), sorteados por partida
+	var floor: Texture2D = _floor_stage2 if phase >= Phase.TITAN else _floor_stage1
+	if floor != null:
+		draw_texture_rect(floor, Rect2(Vector2.ZERO, world_size), true)
+		if phase >= Phase.TITAN:
+			draw_rect(Rect2(Vector2.ZERO, world_size), Color(0.078, 0.067, 0.133, 0.15))
 	else:
 		var floor_col: Color = Color(0.227, 0.184, 0.157).lerp(Color(0.078, 0.067, 0.133), t)
 		draw_rect(Rect2(Vector2.ZERO, world_size), floor_col)
