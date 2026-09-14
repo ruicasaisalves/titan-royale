@@ -19,7 +19,22 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.031h`).
+scheme is `0.0XX` + a letter suffix (current: `0.031i`).
+
+## Context budget (keep a session under ~1M tokens)
+
+The whole source tree is tiny (~15k tokens); a session's budget is spent on its **length** and on
+**large tool outputs**, not on the code. So:
+
+- **Never dump generated/large files whole.** `export_presets.cfg` (mostly a long, all-`false`
+  Android permissions list) and every `*.import` are noise — read one key with Grep, or Read with
+  `offset`/`limit`, and change it with a targeted Edit; never rewrite or `cat` the file.
+- **Treat `assets/` as binary** — never print PNGs; (re)generate them with `tools/gen_floors.py` /
+  `tools/compose_fighters.py`, don't inline their bytes.
+- **Prefer Grep/Glob over reading whole files**; pass `limit`/`head_limit`, and `tail`/filter long
+  command output instead of dumping it.
+- **One task per session.** Start a fresh session (or `/clear`, `/compact`) between unrelated tasks;
+  a long-running session is the main way the budget is blown.
 
 ## Running the project
 
