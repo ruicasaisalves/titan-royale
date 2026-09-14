@@ -38,10 +38,13 @@ var popups: Array = []          # {pos, text, life, col}
 var running: bool = false
 var _player_prev_alive: bool = true
 
-# Biblioteca de chãos (tiles seamless em assets/arena/). No futuro podem
-# agrupar-se por tema; por agora cada partida sorteia um chão para a royale
-# (fase 1) e outro para a fase dos titãs (fase 2).
-const FLOOR_TILES := ["stone_floor", "plaza_grey", "sand_light", "sand_gold", "grass", "grass_dark"]
+# Temas de chão (tiles seamless em assets/arena/): cada tema define o chão
+# da fase 1 (royale) e da fase 2 (titãs). Cada partida sorteia um tema.
+const FLOOR_THEMES := {
+	"Castelo": ["stone_floor", "plaza_grey"],
+	"Areia": ["sand_light", "sand_gold"],
+	"Natureza": ["grass", "grass_dark"],
+}
 var _floor_stage1: Texture2D = null
 var _floor_stage2: Texture2D = null
 
@@ -52,10 +55,11 @@ func _ready() -> void:
 	_pick_floors()
 
 func _pick_floors() -> void:
-	var names: Array = FLOOR_TILES.duplicate()
-	names.shuffle()
-	_floor_stage1 = load("res://assets/arena/%s.png" % names[0])
-	_floor_stage2 = load("res://assets/arena/%s.png" % names[1])
+	var themes: Array = FLOOR_THEMES.keys()
+	var theme: String = themes[randi() % themes.size()]
+	var pair: Array = FLOOR_THEMES[theme]
+	_floor_stage1 = load("res://assets/arena/%s.png" % pair[0])
+	_floor_stage2 = load("res://assets/arena/%s.png" % pair[1])
 
 # ---------- arranque ----------
 func setup(cfg: Dictionary) -> void:
