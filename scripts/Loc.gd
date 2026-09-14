@@ -29,6 +29,11 @@ const STRINGS := {
 	},
 	"enter_arena": {"pt": "ENTRAR NA ARENA", "en": "ENTER THE ARENA"},
 	"back_to_menu": {"pt": "MENU PRINCIPAL", "en": "MAIN MENU"},
+	"coins_earned": {"pt": "+%d moedas", "en": "+%d coins"},
+	"menu_stats": {
+		"pt": "Vitórias %d · Derrotas %d · Moedas %d",
+		"en": "Wins %d · Losses %d · Coins %d",
+	},
 
 	# ---- stats ----
 	"stat_hp": {"pt": "Vida", "en": "Health"},

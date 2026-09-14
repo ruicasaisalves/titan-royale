@@ -84,7 +84,31 @@ deterministic order each frame:
 This ordering matters — it's what would let the simulation later run on a server with clients only
 sending Intents and rendering results. `Phase` enum: `IDLE → MELEE → TRANSITION → TITAN → VICTORY`.
 `_check_top6()` triggers the `MELEE → TRANSITION → TITAN` shift; `_start_titans()` scales up the top-6
-survivors ×10 (hp/atk/size), repositions them in a circle, and clears zombies/items.
+survivors ×10 (hp/atk), ×2.6 (size), repositions them in a circle, and clears zombies/items.
+
+### Camera / zoom (visibility)
+
+`Arena` owns a `Camera2D` (`camera`, made current in `_ready`). During the royale phase it is zoomed
+in (`STAGE1_ZOOM = 2.5`) and follows the player each tick (only while `phase == MELEE`), so fighters
+read large and only part of the world is visible — moving pans the view to find other opponents.
+Fighter body sizes and world size are **unchanged**; this is purely a camera zoom, so hitboxes,
+separation and reach are untouched. At `_start_titans()` the camera tweens back to zoom 1.0 and
+centers, so the shrunk-arena titan showdown shows everyone at once (that's why titans keep their usual
+size). `reset_to_idle()` restores zoom 1.0/centered. The HUD and menus live on a `CanvasLayer`
+(`Main.ui`) and are not affected by the camera. `PlayerController` mouse-drag uses
+`arena.get_local_mouse_position()`, which already accounts for the camera transform.
+
+### Persistence & coins
+
+`scripts/Save.gd` is an autoload singleton (`Save`) that stores a player profile
+(`wins`/`losses`/`games`/`best_place`/`coins`/`upgrades`) as JSON in `user://profile.json` — per-device
+persistent storage (survives restarts; on Android it's the app's private data). When a match ends,
+`Arena._record_result(won, place)` fires **once** per match (guarded by `_result_recorded`, reset in
+`setup()`): on player death (loss, `place = contenders_alive()+1`) and on a player victory
+(`place = 1`). It computes coins (`5 + (total-place)*3 + 60 if won`) and emits `match_ended`. `Main`
+handles it (`_on_match_ended` → `Save.record_match`, shows `+N coins` on the end banner) and shows the
+running totals on the creation screen (`_refresh_menu_stats`). The `upgrades` dict is reserved for a
+future store (apply bought upgrades in `Arena._make_player`).
 
 ### Teams and loyalty
 
