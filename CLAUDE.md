@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.031i`).
+scheme is `0.0XX` + a letter suffix (current: `0.033a`).
 
 ## Context budget (keep a session under ~1M tokens)
 
@@ -46,9 +46,33 @@ Controls: WASD/arrows to move, Space to attack, Shift to dash; dragging the mous
 player.
 
 The scene tree itself is nearly empty (`scenes/Main.tscn` just hosts the `Main.gd` root node) —
-essentially all UI (character creation screen + HUD) and all fighters/items are built and added at
+essentially all UI (the menu screens + HUD) and all fighters/items are built and added at
 runtime from GDScript rather than laid out in the editor. When changing UI, edit the `_build_*`
 functions in `scripts/Main.gd` rather than looking for editor-authored nodes.
+
+### Menu screens
+
+`Main` builds four full-rect `Control` screens under the `ui` `CanvasLayer`, one visible at a time,
+toggled by `_show_screen(root)` (which refreshes the target). From the intro logo you land on
+`menu_root` (**JOGAR / ESTILOS / DEFINIÇÕES**, via `_goto`), and each sub-screen has a `‹ Voltar`
+button back to it:
+
+- **Jogar** (`_build_play`): a 7-button champion grid (`class_buttons`); clicking one calls
+  `_select_class` and `_refresh_play` fills a description panel — name, role, and an attribute bar
+  per stat (`ATTR_KEYS = hp/atk/def/speed/range`, each normalized against the max across
+  `Arch.DATA` by `_attr_max`). An `ENTER THE ARENA` button starts the match. **Player stats are the
+  class's own** (`Arena._make_player` reads `Arch.DATA[cls]` with only the +40% hero HP bonus) — the
+  old player-chosen stat-point allocation was removed; attributes are fixed and logical per class.
+- **Estilos** (`_build_styles`): a champion `‹ name ›` cycler (`_cycle_class`) over a large preview,
+  plus **`‹ ›` arrow rows** (`_cycle_color`, not colour swatches) for hair and cloth colour, each
+  showing a colour chip sampled at runtime (`_layer_avg_color`). Appearance is per class and saved in
+  `Save.data["appearance"]`.
+- **Definições** (`_build_settings`): player name (persisted to `Save.data["player_name"]`), and
+  brightness + music + SFX sliders. Brightness dims a black `ColorRect` overlay on a top
+  `CanvasLayer` (`_apply_brightness`, `layer = 128`). Volume sliders drive dedicated **Music/SFX
+  audio buses** (created under Master by `_ensure_bus`, set via `_apply_bus_volume`) — wired now so
+  audio "just works" once sound is added. All three persist via `Save.get_setting`/`set_setting` and
+  are re-applied on startup by `_apply_saved_settings`.
 
 ## Architecture
 
@@ -101,13 +125,15 @@ size). `reset_to_idle()` restores zoom 1.0/centered. The HUD and menus live on a
 ### Persistence & coins
 
 `scripts/Save.gd` is an autoload singleton (`Save`) that stores a player profile
-(`wins`/`losses`/`games`/`best_place`/`coins`/`upgrades`) as JSON in `user://profile.json` — per-device
-persistent storage (survives restarts; on Android it's the app's private data). When a match ends,
+(`wins`/`losses`/`games`/`best_place`/`coins`/`upgrades`/`appearance`/`player_name`/`settings`) as JSON
+in `user://profile.json` — per-device persistent storage (survives restarts; on Android it's the app's
+private data). `settings` holds the Definições prefs (`brightness`, `vol_music`, `vol_sfx`), read/written
+through `Save.get_setting`/`set_setting`. When a match ends,
 `Arena._record_result(won, place)` fires **once** per match (guarded by `_result_recorded`, reset in
 `setup()`): on player death (loss, `place = contenders_alive()+1`) and on a player victory
 (`place = 1`). It computes coins (`5 + (total-place)*3 + 60 if won`) and emits `match_ended`. `Main`
 handles it (`_on_match_ended` → `Save.record_match`, shows `+N coins` on the end banner) and shows the
-running totals on the creation screen (`_refresh_menu_stats`). The `upgrades` dict is reserved for a
+running totals on the main menu (`_refresh_menu_stats`). The `upgrades` dict is reserved for a
 future store (apply bought upgrades in `Arena._make_player`).
 
 ### Teams and loyalty
@@ -172,11 +198,12 @@ The sheets are composed from the purchased **Heroes99** pack (not in the repo) b
 2=axe, 3=dagger, 4=spear, 5=wand.
 
 **Player appearance (runtime composition).** The human player picks a **hair colour** and a **cloth
-colour** on the creation screen (per class; remembered in `Save`). Only the needed Heroes99 layers are
-committed at `assets/heroes_layers/<Class>/` (`skin`, `face`, `weapon_bot/top`, and
+colour** on the **Estilos** screen with `‹ ›` arrows (per class; remembered in `Save`). Only the needed
+Heroes99 layers are committed at `assets/heroes_layers/<Class>/` (`skin`, `face`, `weapon_bot/top`, and
 `hair_bot/top_c<c>` + `cloth_bot/top_c<c>` for colours 1–8), extracted by
-`tools/extract_player_layers.py <path-to-Heroes99_v1.2>` (which also writes `palette.json` with an
-average colour per variant for the UI swatches). `CharacterComposer.compose(cls, hair_c, cloth_c)`
+`tools/extract_player_layers.py <path-to-Heroes99_v1.2>`. The UI colour chips are sampled from the
+layer textures at runtime (`Main._layer_avg_color`), so no extra palette file ships in the export.
+`CharacterComposer.compose(cls, hair_c, cloth_c)`
 (`scripts/CharacterComposer.gd`, static, cached) stacks those layers in the same z-order as
 `compose_fighters.py` into an 800×680 `ImageTexture`; `Arena._make_player` assigns it to
 `Fighter.sheet_override` **before** `add_child`, and `Fighter._frames_from_texture` slices it exactly
@@ -187,7 +214,7 @@ selection is still a future extension.
 The startup logo is a pixel-art "TITAN ROYALE" wordmark at `assets/ui/logo.png` — a hand-made art
 asset supplied by the author (**not procedurally generated**; do not overwrite it). It is shown as an
 animated in-game intro: `Main._build_intro()` fades/pops it over a dark full-rect `Control` on
-startup, then fades to the creation screen (a tap/key skips it via `_end_intro()`). The engine **boot
+startup, then fades to the main menu (a tap/key skips it via `_end_intro()`). The engine **boot
 splash** (`application/boot_splash/*` in `project.godot`, replacing the Godot logo) uses a separate
 composite `assets/ui/boot_splash.png` — the logo centered, smaller, on the dark background — built by
 `tools/gen_boot_splash.py` (re-run it if `logo.png` changes); it is shown at native size, centered
@@ -195,7 +222,7 @@ composite `assets/ui/boot_splash.png` — the logo centered, smaller, on the dar
 
 When a match ends (player eliminated, or the arena resolves to a winner), `Main._on_banner` reveals a
 **"Main menu"** button in the banner box; pressing it calls `Main._return_to_menu()`, which stops and
-clears the sim via `Arena.reset_to_idle()` and shows the creation screen again for a fresh game.
+clears the sim via `Arena.reset_to_idle()` and shows the main menu again for a fresh game.
 
 The arena floor uses seamless 64×64 tiles from `assets/arena/`, grouped into themes by
 `FLOOR_THEMES` in `Arena.gd` (each theme = `[stage1_royale, stage2_titans]`). Each match
@@ -205,8 +232,11 @@ except `stone_floor.png`, the original. Themes: Castelo, Areia, Natureza, Lava, 
 
 ## Future ideas (not built yet)
 
-- **In-game character selector.** Hair-colour and cloth-colour picking is **done** (runtime
-  composition — see "Player appearance" under Rendering). Still open: letting the player also choose
-  the skin tone, hair style and weapon (add more layers to `extract_player_layers.py` and swatch rows
-  to `Main`), and a future **store** that spends `Save.coins` on upgrades (apply in
+- **In-game character selector.** Hair-colour and cloth-colour picking is **done** (Estilos screen,
+  runtime composition — see "Player appearance" under Rendering). Still open: letting the player also
+  choose the skin tone, hair style and weapon (add more layers to `extract_player_layers.py` and arrow
+  rows to `Main`), and a future **store** that spends `Save.coins` on upgrades (apply in
   `Arena._make_player`, persist in `Save.data["upgrades"]`).
+- **Sound.** The Definições screen already exposes music/SFX volume sliders wired to `Music`/`SFX`
+  audio buses; adding actual `AudioStreamPlayer`s that route to those buses is all that's left.
+- **Per-class symbols.** The Jogar grid uses text buttons; the author plans an icon per class.
