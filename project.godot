@@ -19,9 +19,8 @@ config/version="0.033a"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7")
 boot_splash/bg_color=Color(0.055, 0.063, 0.09, 1)
+boot_splash/stretch_mode=0
 boot_splash/image="res://assets/ui/boot_splash.png"
-boot_splash/fullsize=false
-boot_splash/use_filter=true
 config/icon="res://icon.png"
 
 [autoload]
