@@ -660,6 +660,18 @@ func _build_hud() -> void:
 	menu_btn.pressed.connect(_return_to_menu)
 	hud_root.add_child(menu_btn)
 
+	# indicador de recargas (dash + especial), canto inferior esquerdo,
+	# por cima da barra de vida — cinzento/relógio até poder ser usado
+	var ability_bar = preload("res://scripts/AbilityBar.gd").new()
+	ability_bar.arena = arena
+	ability_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ability_bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	ability_bar.offset_left = 16
+	ability_bar.offset_right = 150
+	ability_bar.offset_top = -108
+	ability_bar.offset_bottom = -54
+	hud_root.add_child(ability_bar)
+
 	# controlos táteis — só aparecem em ecrãs de toque (ou com FORCE_ON_DESKTOP)
 	if Touch.enabled:
 		_build_touch_controls()
@@ -683,6 +695,13 @@ func _build_touch_controls() -> void:
 	dash.color = Color("4fd6c9")
 	_anchor_bottom(dash, 114.0, 68.0, 68.0, BOTTOM + 40.0, true)
 	hud_root.add_child(dash)
+
+	var special := HudTouchButton.new()
+	special.label = Loc.t("btn_special")
+	special.target = "special"
+	special.color = Color("f4c145")
+	_anchor_bottom(special, 30.0, 68.0, 68.0, BOTTOM + 84.0, true)
+	hud_root.add_child(special)
 
 # Posiciona um Control encostado ao fundo, a 'x' da esquerda ou da direita.
 func _anchor_bottom(ctrl: Control, x: float, w: float, h: float, bottom: float, from_right: bool) -> void:

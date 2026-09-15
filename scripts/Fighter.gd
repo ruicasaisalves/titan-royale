@@ -40,6 +40,18 @@ var regen_timer: float = 0.0
 # dash
 var dash_timer: float = 0.0
 var dash_cd: float = 0.0
+var dash_cd_max: float = 3.0        # recarga do dash (segundos)
+
+# ataque especial (1 por classe) + efeitos temporários que ele ativa.
+# A lógica vive na Arena; aqui guarda-se só o estado.
+var special_cd: float = 0.0
+var special_cd_max: float = 5.0     # recarga do especial (itens/trinkets podem reduzir)
+var special_armed: bool = false     # golpe seguinte potenciado (Bruto/Assassino/Lanceiro/Necromante)
+var guard_timer: float = 0.0        # Tanque: reduz dano recebido + reflete
+var rage_timer: float = 0.0         # Bárbaro: +dano/velocidade (escala com vida perdida)
+var poison_timer: float = 0.0       # veneno ativo nesta vítima (Necromante)
+var poison_dps: float = 0.0         # dano/segundo do veneno
+var poison_src = null               # necromante que aplicou o veneno (crédito do zombie)
 
 # equipamento
 var weapons: Array = []        # percentagens (1..10), até 2

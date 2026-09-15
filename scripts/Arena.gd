@@ -260,9 +260,14 @@ func _combat_step(delta: float) -> void:
 	for f in fighters:
 		if not f.alive or not intents.has(f):
 			continue
+		# ataque especial — porta pelo cooldown próprio (5s base, reduzível por itens)
+		if intents[f].special and f.special_cd <= 0.0:
+			f.special_cd = f.special_cd_max
+			_do_special(f)
 		f.cd_timer -= delta
 		if intents[f].attack and f.cd_timer <= 0.0:
-			f.cd_timer = f.cd
+			# Fúria (Bárbaro): ataca ~40% mais depressa enquanto ativa
+			f.cd_timer = f.cd * (0.71 if f.rage_timer > 0.0 else 1.0)
 			_do_attack(f)
 			f.play_attack()
 	# regen + timers + redesenho
@@ -270,6 +275,20 @@ func _combat_step(delta: float) -> void:
 		if not f.alive:
 			continue
 		_regen(f, delta)
+		# recargas e efeitos temporários do especial
+		if f.special_cd > 0.0:
+			f.special_cd -= delta
+		if f.guard_timer > 0.0:
+			f.guard_timer -= delta
+		if f.rage_timer > 0.0:
+			f.rage_timer -= delta
+		# veneno (Praga do Necromante): dano ao longo do tempo
+		if f.poison_timer > 0.0:
+			f.poison_timer -= delta
+			f.hp -= f.poison_dps * delta
+			if f.hp <= 0.0:
+				_handle_death(f, f.poison_src)
+				continue
 		if f.flash > 0.0:
 			f.flash -= delta
 		f.queue_redraw()
@@ -290,7 +309,7 @@ func _combat_step(delta: float) -> void:
 
 func _apply_movement(f, it: Intent, delta: float) -> void:
 	if it.dash and f.dash_cd <= 0.0:
-		f.dash_cd = 0.8
+		f.dash_cd = f.dash_cd_max
 		f.dash_timer = 0.16
 	var boost: float = 3.2 if f.dash_timer > 0.0 else 1.0
 	f.position += it.move * f.speed * boost * delta
@@ -315,6 +334,11 @@ func _separate(f) -> void:
 			f.position += (off / d) * 0.4
 
 func _do_attack(f) -> void:
+	# Perfuração (Lanceiro): o golpe potenciado atravessa e atinge todos em linha
+	if f.special_armed and f.cls == "Lanceiro":
+		_do_pierce(f)
+		f.special_armed = false
+		return
 	if f.is_player():
 		# golpe em arco: acerta em todos os inimigos ao alcance (borda-a-borda)
 		var near: Array = grid.query(f.position, f.attack_range + f.size + 60.0)
@@ -326,13 +350,86 @@ func _do_attack(f) -> void:
 	else:
 		if f.target != null and f.target.alive and f.target.team != f.team:
 			_apply_hit(f, f.target)
+	# o golpe potenciado (Bruto/Assassino/Necromante) gasta-se nesta investida
+	f.special_armed = false
+
+# Ativa o ataque especial da classe (1 por classe). Uns são instantâneos
+# (Tanque/Bárbaro/Sacerdote); os outros "armam" o próximo golpe.
+func _do_special(f) -> void:
+	match f.cls:
+		"Tanque":                    # Contra-Ataque: escudo + reflexão (3s)
+			f.guard_timer = 3.0
+			_add_popup(f.position, Loc.t("sp_guard"), Color("5a86b4"))
+		"Barbaro":                   # Fúria: +dano/velocidade (4s)
+			f.rage_timer = 4.0
+			_add_popup(f.position, Loc.t("sp_rage"), Color("e08a3c"))
+		"Sacerdote":                 # Luz Sagrada: cura-se + dano em área
+			_do_priest_pulse(f)
+		_:                           # Bruto/Assassino/Lanceiro/Necromante: golpe seguinte
+			f.special_armed = true
+			_add_popup(f.position, Loc.t("sp_ready"), f.color)
+	f.play_attack()
+
+# Luz Sagrada (Sacerdote): cura-se a si próprio e queima os inimigos por perto.
+func _do_priest_pulse(f) -> void:
+	f.hp = min(f.max_hp, f.hp + f.max_hp * 0.15)
+	_add_popup(f.position, Loc.t("sp_bless"), Color("efe3a8"))
+	var radius: float = 90.0 + f.size
+	var near: Array = grid.query(f.position, radius)
+	for o in near:
+		if o == f or not o.alive or o.team == f.team:
+			continue
+		if f.position.distance_to(o.position) <= radius + o.size:
+			var d: float = max(1.0, f.atk * 1.5)
+			o.hp -= d
+			o.flash = 0.1
+			_add_popup(o.position, str(int(round(d))), Color("efe3a8"))
+			if o.hp <= 0.0:
+				_handle_death(o, f)
+
+# Perfuração (Lanceiro): atinge todos os inimigos numa linha à frente.
+func _do_pierce(f) -> void:
+	var dir: Vector2 = Vector2(f.facing, 0.0)
+	if f.target != null and f.target.alive:
+		dir = (f.target.position - f.position).normalized()
+	var reach: float = f.attack_range + f.size
+	var near: Array = grid.query(f.position, reach + 40.0)
+	for o in near:
+		if o == f or not o.alive or o.team == f.team:
+			continue
+		var to: Vector2 = o.position - f.position
+		var proj: float = to.dot(dir)               # distância ao longo da linha
+		if proj < 0.0 or proj > reach + o.size:
+			continue
+		var perp: float = (to - dir * proj).length() # afastamento lateral da linha
+		if perp <= o.size + f.size + 8.0:
+			_apply_hit(f, o)
+	f.play_attack()
 
 func _apply_hit(att, tgt) -> void:
 	var dmg: float = max(1.0, att.atk * att.atk_mult() - tgt.def * 0.4) * randf_range(0.85, 1.15)
+	# Fúria (Bárbaro): +30% dano, a subir até +50% conforme a vida perdida
+	if att.rage_timer > 0.0:
+		dmg *= 1.3 + (1.0 - att.hp / att.max_hp) * 0.5
 	var crit: bool = randf() < att.crit_chance()
 	if crit:
 		dmg *= 1.2
+	# golpe especial potenciado
+	var knock_extra: float = 0.0
+	if att.special_armed:
+		match att.cls:
+			"Bruto":                 # Investida: golpe forte + empurrão
+				dmg *= 2.0
+				knock_extra = 40.0
+			"Assassino":             # Golpe Crítico garantido
+				dmg *= 3.0
+				crit = true
 	dmg *= (1.0 - tgt.dmg_reduction())
+	# Contra-Ataque (Tanque): reduz o dano recebido a metade
+	var reflected: float = 0.0
+	if tgt.guard_timer > 0.0:
+		dmg *= 0.5
+		reflected = dmg * 0.5   # reflete 50% do dano (já reduzido) de volta
 	tgt.hp -= dmg
 	tgt.flash = 0.1
 	var pc: Color = Color("f4c145") if (crit or att.is_titan) else Color.WHITE
@@ -342,18 +439,48 @@ func _apply_hit(att, tgt) -> void:
 	_spawn_fx("hit", tgt.position, pc, fscale)
 	var dir: Vector2 = (tgt.position - att.position).normalized()
 	var k: float = 2.4 if att.is_titan else 1.3
-	tgt.position += dir * k * 3.0
+	tgt.position += dir * (k * 3.0 + knock_extra * (tgt.size / 8.0 if att.is_titan else 1.0))
+	# Praga (Necromante): o golpe potenciado aplica veneno
+	if att.special_armed and att.cls == "Necromante":
+		tgt.poison_timer = 4.0
+		tgt.poison_dps = tgt.max_hp * 0.03
+		tgt.poison_src = att
+		_add_popup(tgt.position, Loc.t("sp_poison"), Color("7ac74f"))
+	# reflexão do Tanque (aplicada diretamente, sem recursão)
+	if reflected > 0.0 and att.alive:
+		att.hp -= reflected
+		att.flash = 0.1
+		_add_popup(att.position, str(int(round(reflected))), Color("5a86b4"))
+		if att.hp <= 0.0:
+			_handle_death(att, tgt)
 	if tgt.hp <= 0.0:
-		tgt.alive = false
-		tgt.visible = false
-		# cadáver cosmético (animação "die") + puff de morte
-		var corpse: Node2D = tgt.make_corpse()
-		if corpse != null:
-			add_child(corpse)
-		_spawn_fx("death", tgt.position, Color(0.9, 0.9, 0.95), fscale)
-		# Necromante: 25% de erguer um zombie (só na royale, nunca titã)
-		if att.is_necro and not att.is_zombie and phase == Phase.MELEE and randf() < 0.25:
-			_add_fighter(_make_zombie(tgt, att))
+		_handle_death(tgt, att)
+
+# Morte de um lutador, centralizada: trata do estado, do cadáver cosmético
+# + FX de morte, e da chance de zombie (do golpe do necromante OU do veneno
+# da Praga). 'killer' é quem o abateu.
+func _handle_death(tgt, killer) -> void:
+	if not tgt.alive:
+		return
+	tgt.alive = false
+	tgt.visible = false
+	# cadáver cosmético (animação "die") + puff de morte
+	var corpse: Node2D = tgt.make_corpse()
+	if corpse != null:
+		add_child(corpse)
+	_spawn_fx("death", tgt.position, Color(0.9, 0.9, 0.95), clamp(tgt.size / 8.0, 0.8, 4.0))
+	# quem pode erguer o zombie: o abatedor necromante, ou a origem do veneno
+	var necro = null
+	var chance: float = 0.0
+	if killer != null and killer.is_necro and not killer.is_zombie:
+		necro = killer
+		chance = 0.25
+	if tgt.poison_timer > 0.0 and tgt.poison_src != null \
+			and tgt.poison_src.is_necro and not tgt.poison_src.is_zombie:
+		necro = tgt.poison_src
+		chance = max(chance, 0.5)   # morrer envenenado dá mais probabilidade
+	if necro != null and phase == Phase.MELEE and randf() < chance:
+		_add_fighter(_make_zombie(tgt, necro))
 
 func _regen(f, delta: float) -> void:
 	if f.regen_pct > 0.0:

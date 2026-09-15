@@ -20,6 +20,8 @@ func decide(f, arena) -> Intent:
 		intent.move = to / max(dist, 0.001)
 	else:
 		intent.attack = true
+		# usa o especial assim que estiver disponível (a Arena valida o cooldown)
+		intent.special = f.special_cd <= 0.0
 	return intent
 
 func _find_target(f, arena):
