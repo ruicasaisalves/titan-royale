@@ -16,7 +16,7 @@ const DATA := {
 		"role": {"pt": "Equilibrado. Bom para começar.", "en": "Balanced. Good to start with."},
 	},
 	"Tanque": {
-		"hp": 240.0, "atk": 9.0, "def": 11.0, "speed": 45.0, "range": 26.0,
+		"hp": 200.0, "atk": 9.0, "def": 11.0, "speed": 45.0, "range": 26.0,
 		"cd": 0.97, "size": 11.5, "color": Color("5a86b4"),
 		"name": {"pt": "Tanque", "en": "Tank"},
 		"role": {"pt": "Muita vida e defesa, lento e fraco a atacar.", "en": "Lots of health and defense, slow and weak on offense."},
