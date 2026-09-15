@@ -41,6 +41,8 @@ var item_timer: float = 0.0
 var id_counter: int = 0
 var player: Fighter = null
 var popups: Array = []          # {pos, text, life, col}
+var fx: Array = []              # efeitos visuais transitórios {kind, pos, t, life, col, scale}
+const FX_MAX := 60             # teto de efeitos em simultâneo (100 lutadores)
 var running: bool = false
 var _player_prev_alive: bool = true
 var _result_recorded: bool = false   # garante 1 registo de resultado por partida
@@ -95,6 +97,7 @@ func setup(cfg: Dictionary) -> void:
 	fighters.clear()
 	items.clear()
 	popups.clear()
+	fx.clear()
 	id_counter = 0
 	arena_tint = 0.0
 	item_timer = 0.0
@@ -129,6 +132,7 @@ func reset_to_idle() -> void:
 	fighters.clear()
 	items.clear()
 	popups.clear()
+	fx.clear()
 	player = null
 	phase = Phase.IDLE
 	arena_tint = 0.0
@@ -229,6 +233,7 @@ func _physics_process(delta: float) -> void:
 			_combat_step(delta)
 			_check_victory()
 	_update_popups(delta)
+	_update_fx(delta)
 	queue_redraw()
 
 func _combat_step(delta: float) -> void:
@@ -332,12 +337,20 @@ func _apply_hit(att, tgt) -> void:
 	tgt.flash = 0.1
 	var pc: Color = Color("f4c145") if (crit or att.is_titan) else Color.WHITE
 	_add_popup(tgt.position, str(int(round(dmg))), pc)
+	# faísca no impacto (maior em crit/titã); escala com o tamanho do alvo
+	var fscale: float = clamp(tgt.size / 8.0, 0.8, 4.0)
+	_spawn_fx("hit", tgt.position, pc, fscale)
 	var dir: Vector2 = (tgt.position - att.position).normalized()
 	var k: float = 2.4 if att.is_titan else 1.3
 	tgt.position += dir * k * 3.0
 	if tgt.hp <= 0.0:
 		tgt.alive = false
 		tgt.visible = false
+		# cadáver cosmético (animação "die") + puff de morte
+		var corpse: Node2D = tgt.make_corpse()
+		if corpse != null:
+			add_child(corpse)
+		_spawn_fx("death", tgt.position, Color(0.9, 0.9, 0.95), fscale)
 		# Necromante: 25% de erguer um zombie (só na royale, nunca titã)
 		if att.is_necro and not att.is_zombie and phase == Phase.MELEE and randf() < 0.25:
 			_add_fighter(_make_zombie(tgt, att))
@@ -490,6 +503,22 @@ func _rebuild_grid() -> void:
 func _add_popup(pos: Vector2, text: String, col: Color) -> void:
 	popups.append({"pos": pos, "text": text, "life": 0.6, "col": col})
 
+# ---------- efeitos visuais (procedurais, desenhados em _draw) ----------
+# São só apresentação: reagem a eventos do sim e nunca o alteram.
+func _spawn_fx(kind: String, pos: Vector2, col: Color, scale: float = 1.0) -> void:
+	if fx.size() >= FX_MAX:
+		return
+	var life: float = 0.35 if kind == "hit" else 0.5
+	fx.append({"kind": kind, "pos": pos, "t": 0.0, "life": life, "col": col, "scale": scale})
+
+func _update_fx(delta: float) -> void:
+	var kept: Array = []
+	for e in fx:
+		e["t"] = e["t"] + delta
+		if e["t"] < e["life"]:
+			kept.append(e)
+	fx = kept
+
 func _update_popups(delta: float) -> void:
 	var kept: Array = []
 	for p in popups:
@@ -518,6 +547,24 @@ func _draw() -> void:
 	draw_arc(world_size / 2.0, min(world_size.x, world_size.y) * 0.42, 0, TAU, 64, ring, 2.0)
 	if t > 0.3:
 		draw_arc(world_size / 2.0, min(world_size.x, world_size.y) * 0.28, 0, TAU, 64, Color(0.61, 0.42, 1.0, 0.15 * t), 2.0)
+	# efeitos: faísca de dano (anel a expandir) e puff de morte (anel + raios)
+	for e in fx:
+		var pr: float = clamp(e["t"] / e["life"], 0.0, 1.0)
+		var ec: Color = e["col"]
+		var sc: float = e["scale"]
+		match e["kind"]:
+			"hit":
+				ec.a = (1.0 - pr) * 0.9
+				draw_arc(e["pos"], lerp(3.0, 16.0 * sc, pr), 0, TAU, 16, ec, 2.0)
+			"death":
+				ec.a = (1.0 - pr) * 0.8
+				var rr: float = lerp(4.0, 26.0 * sc, pr)
+				draw_arc(e["pos"], rr, 0, TAU, 20, ec, 2.0)
+				for i in range(8):
+					var ang: float = TAU * i / 8.0
+					var d1: float = lerp(2.0, 22.0 * sc, pr)
+					draw_line(e["pos"] + Vector2.RIGHT.rotated(ang) * (d1 * 0.5),
+						e["pos"] + Vector2.RIGHT.rotated(ang) * d1, ec, 1.5)
 	var font: Font = ThemeDB.fallback_font
 	for p in popups:
 		var c: Color = p["col"]

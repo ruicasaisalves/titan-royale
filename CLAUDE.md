@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.033b`).
+scheme is `0.0XX` + a letter suffix (current: `0.034a`).
 
 ## Context budget (keep a session under ~1M tokens)
 
@@ -191,6 +191,18 @@ picks the animation from state (`moving`, `dash_timer`, an attack pulse via `pla
 `Arena._apply_movement` sets `moving`/`facing`; the attack loop calls `play_attack()`. `Fighter._draw()`
 now only paints the shadow, auras/rings, HP bar and player name over the sprite (the sprite uses
 `show_behind_parent`); the old circle body remains solely as a fallback when a sheet is missing.
+
+**Combat VFX (procedural).** Visual feedback is presentation-only: it reacts to sim events and never
+feeds back into the sim (netcode-safe). It has two layers. **(1) Sprite:** on damage the target flashes
+white (`Fighter.flash`, set in `Arena._apply_hit`); on death, instead of just hiding the fighter,
+`Fighter.make_corpse()` returns a detached `AnimatedSprite2D` that plays the `die` row once and
+self-frees (`animation_finished` → `queue_free`) — the fighter is still removed from the sim that same
+tick, the corpse is purely cosmetic. **(2) FX layer:** `Arena.fx` is a list of transient effects
+(mirrors the `popups` text list) — `_spawn_fx(kind, pos, col, scale)` (capped at `FX_MAX`), aged by
+`_update_fx`, drawn procedurally in `Arena._draw` (no assets). Kinds so far: `hit` (expanding spark
+ring) and `death` (puff ring + radial rays); both are spawned from `_apply_hit`, scaled by target size.
+Damage/heal numbers still use the separate `popups` system. Still to do (Phase 2): caster VFX —
+zombie-raise burst, priest heal glow, cosmetic ranged bolts (att→tgt).
 
 The sheets are composed from the purchased **Heroes99** pack (not in the repo) by
 `tools/compose_fighters.py` — edit its `CLASSES` table (cloth/hair/weapon/color per class) and re-run
