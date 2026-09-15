@@ -19,7 +19,7 @@ project. There is nothing to install/build/lint/test from the CLI.
 
 **Versioning:** bump the version on every change. Update `config/version` in `project.godot` (and
 `version/name` — plus increment `version/code` — in `export_presets.cfg`) so they stay in sync. The
-scheme is `0.0XX` + a letter suffix (current: `0.033a`).
+scheme is `0.0XX` + a letter suffix (current: `0.033b`).
 
 ## Context budget (keep a session under ~1M tokens)
 
@@ -220,9 +220,12 @@ composite `assets/ui/boot_splash.png` — the logo centered, smaller, on the dar
 `tools/gen_boot_splash.py` (re-run it if `logo.png` changes); it is shown at native size, centered
 (`boot_splash/fullsize=false`).
 
-When a match ends (player eliminated, or the arena resolves to a winner), `Main._on_banner` reveals a
-**"Main menu"** button in the banner box; pressing it calls `Main._return_to_menu()`, which stops and
-clears the sim via `Arena.reset_to_idle()` and shows the main menu again for a fresh game.
+A **persistent "Main menu" exit button** (`menu_btn`) sits top-right in the HUD (a direct child of
+`hud_root`, **not** inside `banner_box`, so transient banners like "Top 6" auto-hiding never take it
+with them). `_update_exit_button()` — called every frame from `_process` and on each `_on_banner` —
+shows it whenever the player is eliminated (any phase, so you can leave while spectating the titan
+showdown) or the match is over. Pressing it calls `Main._return_to_menu()`, which stops and clears the
+sim via `Arena.reset_to_idle()` and shows the main menu again for a fresh game.
 
 The arena floor uses seamless 64×64 tiles from `assets/arena/`, grouped into themes by
 `FLOOR_THEMES` in `Arena.gd` (each theme = `[stage1_royale, stage2_titans]`). Each match
