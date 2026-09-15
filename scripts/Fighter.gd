@@ -119,6 +119,28 @@ func play_attack() -> void:
 	_attack_t = float(d[2]) / float(d[3])
 	_sprite.play(_attack_name)
 
+# Cria um "cadáver" cosmético: um sprite solto que toca a animação de morte
+# (linha "die" da folha) e se auto-liberta no fim. Fica DESACOPLADO do sim — o
+# lutador é removido na mesma no próprio tick; isto é só apresentação (e assim
+# é seguro para o netcode futuro). Devolve o nó para a Arena o adicionar.
+func make_corpse() -> Node2D:
+	if _sprite == null or _sprite.sprite_frames == null:
+		return null
+	if not _sprite.sprite_frames.has_animation("die"):
+		return null
+	var c := AnimatedSprite2D.new()
+	c.sprite_frames = _sprite.sprite_frames   # partilhado (mesma folha)
+	c.centered = true
+	c.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	c.scale = _sprite.scale
+	c.flip_h = _sprite.flip_h
+	c.position = position
+	c.z_index = int(position.y)
+	c.modulate = Color(0.55, 0.85, 0.45) if is_zombie else Color.WHITE
+	c.animation_finished.connect(c.queue_free)
+	c.play("die")
+	return c
+
 func _get_frames(key: String) -> SpriteFrames:
 	if key == "":
 		return null
