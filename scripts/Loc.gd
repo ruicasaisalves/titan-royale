@@ -37,16 +37,31 @@ const STRINGS := {
 		"en": "Wins %d · Losses %d · Coins %d",
 	},
 
+	# ---- menu principal ----
+	"menu_play": {"pt": "JOGAR", "en": "PLAY"},
+	"menu_styles": {"pt": "ESTILOS", "en": "STYLES"},
+	"menu_settings": {"pt": "DEFINIÇÕES", "en": "SETTINGS"},
+	"back": {"pt": "‹ Voltar", "en": "‹ Back"},
+
+	# ---- ecrã jogar ----
+	"choose_champion": {"pt": "Escolhe o teu Champion", "en": "Choose your champion"},
+	"champion_hint": {"pt": "Toca num Champion para ver os detalhes.", "en": "Tap a champion to see its details."},
+
+	# ---- ecrã estilos ----
+	"styles_title": {"pt": "Estilos", "en": "Styles"},
+
+	# ---- ecrã definições ----
+	"settings_title": {"pt": "Definições", "en": "Settings"},
+	"setting_brightness": {"pt": "Brilho", "en": "Brightness"},
+	"setting_music": {"pt": "Música", "en": "Music"},
+	"setting_sfx": {"pt": "Efeitos", "en": "Sound FX"},
+
 	# ---- stats ----
 	"stat_hp": {"pt": "Vida", "en": "Health"},
 	"stat_atk": {"pt": "Ataque", "en": "Attack"},
 	"stat_def": {"pt": "Defesa", "en": "Defense"},
 	"stat_spd": {"pt": "Velocidade", "en": "Speed"},
-	"points_left": {"pt": "Pontos de stats — restam %d", "en": "Stat points — %d left"},
-	"stats_line": {
-		"pt": "%s — %s\nVida %d · Ataque %d · Defesa %d · Vel %d · Alcance %d",
-		"en": "%s — %s\nHealth %d · Attack %d · Defense %d · Spd %d · Range %d",
-	},
+	"stat_range": {"pt": "Alcance", "en": "Range"},
 
 	# ---- HUD ----
 	"hud_alive": {"pt": "Vivos: %d", "en": "Alive: %d"},

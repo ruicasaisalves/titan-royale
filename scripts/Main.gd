@@ -3,33 +3,42 @@ extends Node2D
 # cria a Arena e liga os sinais. A UI aqui é propositadamente
 # simples (sem tema) — a ideia é desenhá-la depois no editor.
 
-const TOTAL_POINTS := 6
-
 var cfg := {
 	"cls": "Bruto",
 	"name": "",
 	"color": Color("f4c145"),
 	"hair_c": 1,
 	"cloth_c": 1,
-	"points": {"hp": 0, "atk": 0, "def": 0, "spd": 0},
 }
 
 var arena: Arena
 var ui: CanvasLayer
-var creation_root: Control
+# ecrãs do menu (um visível de cada vez) + HUD + intro
+var menu_root: Control
+var play_root: Control
+var styles_root: Control
+var settings_root: Control
 var hud_root: Control
 var intro_root: Control
 
-# refs de UI
+# refs de UI — menu
+var stats_menu_label: Label
+# refs de UI — jogar (grelha de classes + painel de descrição)
 var class_buttons := {}
-var stats_label: Label
-var points_left_label: Label
-# seletor de estilo (aparência)
+var desc_name: Label
+var desc_role: Label
+var attr_fill := {}   # {stat: ColorRect} barras de atributos
+var attr_val := {}    # {stat: Label} valores
+# refs de UI — estilos (setas < > por cabelo/roupa)
 var char_preview: TextureRect
-var hair_swatches := {}
-var cloth_swatches := {}
+var styles_class_label: Label
+var hair_chip: ColorRect
+var cloth_chip: ColorRect
 var palette := {}   # cache de cores das amostras (chave "cls|kind|c")
-var point_value_labels := {}
+# brilho (overlay escuro por cima de tudo)
+var brightness_overlay: ColorRect
+
+const ATTR_KEYS := ["hp", "atk", "def", "speed", "range"]
 
 var hud_alive: Label
 var hud_phase: Label
@@ -41,7 +50,6 @@ var banner_sub: Label
 var banner_box: Control
 var menu_btn: Button
 var coins_label: Label
-var stats_menu_label: Label
 
 func _ready() -> void:
 	arena = Arena.new()
@@ -53,10 +61,16 @@ func _ready() -> void:
 
 	ui = CanvasLayer.new()
 	add_child(ui)
-	_build_creation()
+	_build_menu()
+	_build_play()
+	_build_styles()
+	_build_settings()
 	_build_hud()
+	_build_overlay()
+	_apply_saved_settings()
 	_build_intro()
-	_select_class("Bruto")
+	_select_class(cfg["cls"])
+	_show_screen(menu_root)
 
 func _process(_delta: float) -> void:
 	# atualiza HP e equipamento do jogador (poll simples)
@@ -84,61 +98,131 @@ func _gear_text(p) -> String:
 	if cr > 0: s += Loc.t("gear_crit", [cr])
 	return s
 
-# ============ ECRÃ DE CRIAÇÃO ============
-func _build_creation() -> void:
-	creation_root = Control.new()
-	creation_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(creation_root)
+# ============ MENU / JOGAR / ESTILOS / DEFINIÇÕES ============
+const COLORS := [1, 2, 3, 4, 5, 6, 7, 8]   # cores disponíveis (c1..c8)
 
+# Mostra um ecrã do menu e esconde os outros; refresca o ecrã alvo.
+func _show_screen(target: Control) -> void:
+	for s in [menu_root, play_root, styles_root, settings_root]:
+		if s != null:
+			s.visible = (s == target)
+	if target == menu_root:
+		_refresh_menu_stats()
+	elif target == play_root:
+		_refresh_play()
+	elif target == styles_root:
+		_refresh_styles()
+
+# ---- helpers de layout ----
+func _screen_root() -> Control:
+	var r := Control.new()
+	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	r.visible = false
+	ui.add_child(r)
+	return r
+
+# Painel central (fundo + margem) dentro de 'parent'; devolve o VBox de conteúdo.
+func _panel_vbox(parent: Control) -> VBoxContainer:
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	creation_root.add_child(center)
-
+	parent.add_child(center)
 	var panel := PanelContainer.new()
 	center.add_child(panel)
-
 	var margin := MarginContainer.new()
 	for m in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
 		margin.add_theme_constant_override(m, 20)
 	panel.add_child(margin)
-
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
+	vb.add_theme_constant_override("separation", 12)
 	margin.add_child(vb)
+	return vb
 
-	# título + versão (lida de Project Settings -> Application -> Config -> Version)
+func _title(txt: String, sz: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.add_theme_font_size_override("font_size", sz)
+	l.add_theme_color_override("font_color", col)
+	return l
+
+func _spacer(h: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(0, h)
+	return c
+
+func _back_button() -> Button:
+	var b := Button.new()
+	b.text = Loc.t("back")
+	b.custom_minimum_size = Vector2(90, 40)
+	b.pressed.connect(_show_screen.bind(menu_root))
+	return b
+
+func _arrow_button(txt: String) -> Button:
+	var b := Button.new()
+	b.text = txt
+	b.custom_minimum_size = Vector2(48, 44)
+	b.add_theme_font_size_override("font_size", 22)
+	return b
+
+# ---- menu principal ----
+func _build_menu() -> void:
+	menu_root = _screen_root()
+	var vb := _panel_vbox(menu_root)
+
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 10)
-	title_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(title_row)
-	title_row.add_child(_title("TITAN ROYALE", 26, Color("f4c145")))
+	title_row.add_child(_title("TITAN ROYALE", 30, Color("f4c145")))
 	var ver := _title("v" + str(ProjectSettings.get_setting("application/config/version", "0.0")), 11, Color("8a8fa3"))
 	ver.size_flags_vertical = Control.SIZE_SHRINK_END
 	title_row.add_child(ver)
 
-	# estatísticas do perfil persistente (vitórias/derrotas/moedas)
-	stats_menu_label = _title("", 13, Color("f4c145"))
+	stats_menu_label = _title("", 14, Color("f4c145"))
+	stats_menu_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(stats_menu_label)
 	_refresh_menu_stats()
 
-	# Duas colunas lado a lado (classes | lutador) para caber nos 600px
-	# de altura — uma coluna única com botões de toque ficava cortada.
+	vb.add_child(_spacer(8))
+	vb.add_child(_menu_button(Loc.t("menu_play"), "play"))
+	vb.add_child(_menu_button(Loc.t("menu_styles"), "styles"))
+	vb.add_child(_menu_button(Loc.t("menu_settings"), "settings"))
+
+func _menu_button(text: String, which: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(300, 56)
+	b.add_theme_font_size_override("font_size", 22)
+	b.pressed.connect(_goto.bind(which))
+	return b
+
+# Navega para um ecrã do menu (lido no clique, quando os roots já existem).
+func _goto(which: String) -> void:
+	match which:
+		"play": _show_screen(play_root)
+		"styles": _show_screen(styles_root)
+		"settings": _show_screen(settings_root)
+		_: _show_screen(menu_root)
+
+# ---- ecrã jogar ----
+func _build_play() -> void:
+	play_root = _screen_root()
+	var vb := _panel_vbox(play_root)
+
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	vb.add_child(head)
+	head.add_child(_back_button())
+	head.add_child(_title(Loc.t("choose_champion"), 20, Color("f4c145")))
+
 	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 28)
+	cols.add_theme_constant_override("separation", 24)
 	vb.add_child(cols)
 
+	# esquerda: grelha dos 7 Champions
 	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", 10)
-	left.custom_minimum_size = Vector2(290, 0)
+	left.add_theme_constant_override("separation", 8)
+	left.custom_minimum_size = Vector2(300, 0)
 	cols.add_child(left)
-
-	var right := VBoxContainer.new()
-	right.add_theme_constant_override("separation", 10)
-	right.custom_minimum_size = Vector2(340, 0)
-	cols.add_child(right)
-
-	# ---- coluna esquerda: classes ----
-	left.add_child(_title(Loc.t("creation_class_title"), 12, Color("8a8fa3")))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -151,147 +235,180 @@ func _build_creation() -> void:
 		b.pressed.connect(_select_class.bind(cls))
 		grid.add_child(b)
 		class_buttons[cls] = b
-
-	stats_label = Label.new()
-	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stats_label.custom_minimum_size = Vector2(290, 0)
-	left.add_child(stats_label)
-
-	# ---- coluna direita: o teu lutador ----
-	right.add_child(_title(Loc.t("creation_fighter_title"), 12, Color("8a8fa3")))
-
-	var name_row := HBoxContainer.new()
-	name_row.add_theme_constant_override("separation", 10)
-	right.add_child(name_row)
-	var nlbl := Label.new()
-	nlbl.text = Loc.t("name_label")
-	name_row.add_child(nlbl)
-	var line := LineEdit.new()
-	line.placeholder_text = Loc.t("name_placeholder")
-	line.max_length = 14
-	line.custom_minimum_size = Vector2(220, 0)
-	line.text_changed.connect(func(t): cfg["name"] = t.strip_edges())
-	name_row.add_child(line)
-
-	# ---- aparência: pré-visualização + cor do cabelo/roupa (por classe) ----
-	var appearance_row := HBoxContainer.new()
-	appearance_row.add_theme_constant_override("separation", 14)
-	right.add_child(appearance_row)
-
-	char_preview = TextureRect.new()
-	char_preview.custom_minimum_size = Vector2(150, 90)
-	char_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	char_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	appearance_row.add_child(char_preview)
-
-	var swatches_col := VBoxContainer.new()
-	swatches_col.add_theme_constant_override("separation", 6)
-	appearance_row.add_child(swatches_col)
-	swatches_col.add_child(_swatch_row(Loc.t("hair_label"), "hair"))
-	swatches_col.add_child(_swatch_row(Loc.t("cloth_label"), "cloth"))
-
-	points_left_label = Label.new()
-	right.add_child(points_left_label)
-	for key in ["hp", "atk", "def", "spd"]:
-		right.add_child(_point_row(key))
-
 	var hint := Label.new()
 	hint.add_theme_font_size_override("font_size", 11)
 	hint.add_theme_color_override("font_color", Color("8a8fa3"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(340, 0)
-	hint.text = Loc.t("hint_touch") if Touch.enabled else Loc.t("hint_keyboard")
-	right.add_child(hint)
+	hint.custom_minimum_size = Vector2(300, 0)
+	hint.text = Loc.t("champion_hint")
+	left.add_child(hint)
 
-	var start := Button.new()
-	start.text = Loc.t("enter_arena")
-	start.custom_minimum_size = Vector2(0, 50)
-	start.pressed.connect(_start_game)
-	right.add_child(start)
+	# direita: descrição + atributos + jogar
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 8)
+	right.custom_minimum_size = Vector2(330, 0)
+	cols.add_child(right)
+	desc_name = _title("", 22, Color("ece5d3"))
+	right.add_child(desc_name)
+	desc_role = Label.new()
+	desc_role.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_role.custom_minimum_size = Vector2(330, 44)
+	desc_role.add_theme_color_override("font_color", Color("8a8fa3"))
+	right.add_child(desc_role)
+	for key in ATTR_KEYS:
+		right.add_child(_attr_row(key))
+	var play_btn := Button.new()
+	play_btn.text = Loc.t("enter_arena")
+	play_btn.custom_minimum_size = Vector2(0, 52)
+	play_btn.add_theme_font_size_override("font_size", 18)
+	play_btn.pressed.connect(_start_game)
+	right.add_child(play_btn)
 
-	_refresh_points()
-
-func _title(txt: String, sz: int, col: Color) -> Label:
-	var l := Label.new()
-	l.text = txt
-	l.add_theme_font_size_override("font_size", sz)
-	l.add_theme_color_override("font_color", col)
-	return l
-
-func _point_row(key: String) -> HBoxContainer:
-	var labels := {"hp": Loc.t("stat_hp"), "atk": Loc.t("stat_atk"), "def": Loc.t("stat_def"), "spd": Loc.t("stat_spd")}
+# Uma linha de atributo: nome + barra proporcional + valor.
+func _attr_row(key: String) -> HBoxContainer:
+	var labels := {
+		"hp": Loc.t("stat_hp"), "atk": Loc.t("stat_atk"), "def": Loc.t("stat_def"),
+		"speed": Loc.t("stat_spd"), "range": Loc.t("stat_range"),
+	}
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var name_l := Label.new()
 	name_l.text = labels[key]
-	name_l.custom_minimum_size = Vector2(120, 0)
+	name_l.custom_minimum_size = Vector2(92, 0)
+	name_l.add_theme_font_size_override("font_size", 13)
 	row.add_child(name_l)
-	var minus := Button.new()
-	minus.text = "-"
-	minus.custom_minimum_size = Vector2(44, 44)
-	minus.pressed.connect(_change_point.bind(key, -1))
-	row.add_child(minus)
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color(1, 1, 1, 0.12)
+	bar_bg.custom_minimum_size = Vector2(150, 14)
+	row.add_child(bar_bg)
+	var fill := ColorRect.new()
+	fill.color = Color("f4c145")
+	fill.position = Vector2.ZERO
+	fill.size = Vector2(0, 14)
+	bar_bg.add_child(fill)
+	attr_fill[key] = fill
 	var val := Label.new()
-	val.text = "0"
-	val.custom_minimum_size = Vector2(24, 0)
-	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	val.custom_minimum_size = Vector2(40, 0)
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	val.add_theme_font_size_override("font_size", 13)
 	row.add_child(val)
-	point_value_labels[key] = val
-	var plus := Button.new()
-	plus.text = "+"
-	plus.custom_minimum_size = Vector2(44, 44)
-	plus.pressed.connect(_change_point.bind(key, 1))
-	row.add_child(plus)
+	attr_val[key] = val
 	return row
 
-func _points_used() -> int:
-	var pts: Dictionary = cfg["points"]
-	return pts["hp"] + pts["atk"] + pts["def"] + pts["spd"]
+func _attr_max(key: String) -> float:
+	var m := 0.001
+	for c in Arch.DATA:
+		m = max(m, float(Arch.DATA[c][key]))
+	return m
 
-func _change_point(key: String, d: int) -> void:
-	var pts: Dictionary = cfg["points"]
-	if d > 0 and _points_used() >= TOTAL_POINTS:
+func _refresh_play() -> void:
+	var cls: String = cfg["cls"]
+	for name in class_buttons:
+		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
+	if desc_name == null:
 		return
-	if d < 0 and pts[key] <= 0:
-		return
-	pts[key] = max(0, pts[key] + d)
-	_refresh_points()
+	var a: Dictionary = Arch.DATA[cls]
+	desc_name.text = Arch.disp(cls)
+	desc_role.text = Arch.role(cls)
+	for key in ATTR_KEYS:
+		var ratio: float = clamp(float(a[key]) / _attr_max(key), 0.0, 1.0)
+		attr_fill[key].size = Vector2(150.0 * ratio, 14)
+		attr_val[key].text = str(int(a[key]))
 
-func _refresh_points() -> void:
-	points_left_label.text = Loc.t("points_left", [TOTAL_POINTS - _points_used()])
-	for key in point_value_labels:
-		point_value_labels[key].text = str(cfg["points"][key])
+# ---- ecrã estilos (setas < > para cabelo/roupa e Champion) ----
+func _build_styles() -> void:
+	styles_root = _screen_root()
+	var vb := _panel_vbox(styles_root)
 
-# ---- aparência (cabelo/roupa) ----
-const COLORS := [1, 2, 3, 4, 5, 6, 7, 8]   # cores disponíveis (c1..c8)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	vb.add_child(head)
+	head.add_child(_back_button())
+	head.add_child(_title(Loc.t("styles_title"), 20, Color("f4c145")))
 
-func _swatch_row(text: String, kind: String) -> HBoxContainer:
+	vb.add_child(_arrow_row_class())
+
+	char_preview = TextureRect.new()
+	char_preview.custom_minimum_size = Vector2(240, 150)
+	char_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	char_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var pv := CenterContainer.new()
+	pv.add_child(char_preview)
+	vb.add_child(pv)
+
+	vb.add_child(_arrow_row_color(Loc.t("hair_label"), "hair"))
+	vb.add_child(_arrow_row_color(Loc.t("cloth_label"), "cloth"))
+
+func _arrow_row_class() -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	var l := _arrow_button("‹")
+	l.pressed.connect(_cycle_class.bind(-1))
+	row.add_child(l)
+	styles_class_label = _title("", 20, Color("ece5d3"))
+	styles_class_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	styles_class_label.custom_minimum_size = Vector2(180, 0)
+	row.add_child(styles_class_label)
+	var r := _arrow_button("›")
+	r.pressed.connect(_cycle_class.bind(1))
+	row.add_child(r)
+	return row
+
+func _arrow_row_color(text: String, kind: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.custom_minimum_size = Vector2(58, 0)
+	lbl.custom_minimum_size = Vector2(64, 0)
 	row.add_child(lbl)
-	for c in COLORS:
-		var sw := ColorRect.new()
-		sw.custom_minimum_size = Vector2(24, 24)
-		sw.mouse_filter = Control.MOUSE_FILTER_STOP
-		var ci := int(c)
-		sw.gui_input.connect(func(e): _on_color_pick(e, kind, ci))
-		row.add_child(sw)
-		if kind == "hair":
-			hair_swatches[ci] = sw
-		else:
-			cloth_swatches[ci] = sw
+	var l := _arrow_button("‹")
+	l.pressed.connect(_cycle_color.bind(kind, -1))
+	row.add_child(l)
+	var chip := ColorRect.new()
+	chip.custom_minimum_size = Vector2(48, 28)
+	row.add_child(chip)
+	if kind == "hair":
+		hair_chip = chip
+	else:
+		cloth_chip = chip
+	var r := _arrow_button("›")
+	r.pressed.connect(_cycle_color.bind(kind, 1))
+	row.add_child(r)
 	return row
 
-func _on_color_pick(e: InputEvent, kind: String, c: int) -> void:
-	if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
-		cfg["hair_c" if kind == "hair" else "cloth_c"] = c
-		_refresh_appearance()
+func _cycle_class(dir: int) -> void:
+	var ns := Arch.names()
+	var i: int = ns.find(cfg["cls"])
+	if i == -1:
+		i = 0
+	i = (i + dir + ns.size()) % ns.size()
+	_select_class(ns[i])
+
+func _cycle_color(kind: String, dir: int) -> void:
+	var field := "hair_c" if kind == "hair" else "cloth_c"
+	var i: int = COLORS.find(int(cfg[field]))
+	if i == -1:
+		i = 0
+	i = (i + dir + COLORS.size()) % COLORS.size()
+	cfg[field] = COLORS[i]
+	_refresh_styles()
+
+func _refresh_styles() -> void:
+	var cls: String = cfg["cls"]
+	if styles_class_label != null:
+		styles_class_label.text = Arch.disp(cls)
+	if hair_chip != null:
+		hair_chip.color = _layer_avg_color(cls, "hair", int(cfg["hair_c"]))
+	if cloth_chip != null:
+		cloth_chip.color = _layer_avg_color(cls, "cloth", int(cfg["cloth_c"]))
+	# a cor de destaque (aros/nome) segue a roupa escolhida
+	cfg["color"] = _layer_avg_color(cls, "cloth", int(cfg["cloth_c"]))
+	if char_preview != null:
+		char_preview.texture = CharacterComposer.preview(cls, int(cfg["hair_c"]), int(cfg["cloth_c"]))
 
 # Cor média (célula idle) da camada de topo — para pintar a amostra da UI.
-# Amostra as texturas em runtime (sem depender de ficheiros extra no export).
 func _layer_avg_color(cls: String, kind: String, c: int) -> Color:
 	var key := "%s|%s|%d" % [cls, kind, c]
 	if palette.has(key):
@@ -318,36 +435,117 @@ func _layer_avg_color(cls: String, kind: String, c: int) -> Color:
 						n += 1
 			if n > 0:
 				col = Color(r / n, g / n, b / n)
-	palette[key] = col   # cache
+	palette[key] = col
 	return col
 
-func _refresh_appearance() -> void:
-	var cls: String = cfg["cls"]
-	for c in hair_swatches:
-		hair_swatches[c].color = _layer_avg_color(cls, "hair", c)
-		hair_swatches[c].modulate = Color.WHITE if c == int(cfg["hair_c"]) else Color(1, 1, 1, 0.4)
-	for c in cloth_swatches:
-		cloth_swatches[c].color = _layer_avg_color(cls, "cloth", c)
-		cloth_swatches[c].modulate = Color.WHITE if c == int(cfg["cloth_c"]) else Color(1, 1, 1, 0.4)
-	# a cor de destaque (aros/nome) segue a roupa escolhida
-	cfg["color"] = _layer_avg_color(cls, "cloth", int(cfg["cloth_c"]))
-	if char_preview != null:
-		char_preview.texture = CharacterComposer.preview(cls, int(cfg["hair_c"]), int(cfg["cloth_c"]))
+# ---- ecrã definições ----
+func _build_settings() -> void:
+	settings_root = _screen_root()
+	var vb := _panel_vbox(settings_root)
 
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	vb.add_child(head)
+	head.add_child(_back_button())
+	head.add_child(_title(Loc.t("settings_title"), 20, Color("f4c145")))
+
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	vb.add_child(name_row)
+	var nlbl := Label.new()
+	nlbl.text = Loc.t("name_label")
+	nlbl.custom_minimum_size = Vector2(110, 0)
+	name_row.add_child(nlbl)
+	var line := LineEdit.new()
+	line.placeholder_text = Loc.t("name_placeholder")
+	line.max_length = 14
+	line.text = str(Save.data.get("player_name", ""))
+	line.custom_minimum_size = Vector2(240, 0)
+	line.text_changed.connect(_on_name_changed)
+	name_row.add_child(line)
+
+	vb.add_child(_slider_row(Loc.t("setting_brightness"), float(Save.get_setting("brightness", 1.0)), 0.5, 1.0, _on_brightness))
+	vb.add_child(_slider_row(Loc.t("setting_music"), float(Save.get_setting("vol_music", 1.0)), 0.0, 1.0, _on_music))
+	vb.add_child(_slider_row(Loc.t("setting_sfx"), float(Save.get_setting("vol_sfx", 1.0)), 0.0, 1.0, _on_sfx))
+
+func _slider_row(text: String, value: float, mn: float, mx: float, cb: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.custom_minimum_size = Vector2(110, 0)
+	row.add_child(lbl)
+	var sl := HSlider.new()
+	sl.min_value = mn
+	sl.max_value = mx
+	sl.step = 0.05
+	sl.value = value
+	sl.custom_minimum_size = Vector2(240, 24)
+	sl.value_changed.connect(cb)
+	row.add_child(sl)
+	return row
+
+func _on_name_changed(t: String) -> void:
+	cfg["name"] = t.strip_edges()
+	Save.data["player_name"] = cfg["name"]
+	Save.save_profile()
+
+func _on_brightness(v: float) -> void:
+	_apply_brightness(v)
+	Save.set_setting("brightness", v)
+
+func _on_music(v: float) -> void:
+	_apply_bus_volume("Music", v)
+	Save.set_setting("vol_music", v)
+
+func _on_sfx(v: float) -> void:
+	_apply_bus_volume("SFX", v)
+	Save.set_setting("vol_sfx", v)
+
+# ---- brilho (overlay) + volumes (buses de áudio) ----
+func _build_overlay() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 128   # por cima de tudo (menus, HUD, intro)
+	add_child(layer)
+	brightness_overlay = ColorRect.new()
+	brightness_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	brightness_overlay.color = Color(0, 0, 0, 0.0)
+	brightness_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(brightness_overlay)
+
+func _apply_brightness(v: float) -> void:
+	if brightness_overlay != null:
+		brightness_overlay.color.a = clamp(1.0 - v, 0.0, 0.6)
+
+func _ensure_bus(name: String) -> int:
+	var idx := AudioServer.get_bus_index(name)
+	if idx == -1:
+		AudioServer.add_bus()
+		idx = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, name)
+		AudioServer.set_bus_send(idx, "Master")
+	return idx
+
+func _apply_bus_volume(name: String, v: float) -> void:
+	var idx := _ensure_bus(name)
+	AudioServer.set_bus_mute(idx, v <= 0.001)
+	AudioServer.set_bus_volume_db(idx, linear_to_db(max(v, 0.001)))
+
+func _apply_saved_settings() -> void:
+	cfg["name"] = str(Save.data.get("player_name", ""))
+	_apply_brightness(float(Save.get_setting("brightness", 1.0)))
+	_apply_bus_volume("Music", float(Save.get_setting("vol_music", 1.0)))
+	_apply_bus_volume("SFX", float(Save.get_setting("vol_sfx", 1.0)))
+
+# Escolhe a classe atual: guarda no cfg, carrega a aparência guardada e refresca.
 func _select_class(cls: String) -> void:
 	cfg["cls"] = cls
-	for name in class_buttons:
-		class_buttons[name].modulate = Color("f4c145") if name == cls else Color.WHITE
-	var a: Dictionary = Arch.DATA[cls]
-	stats_label.text = Loc.t("stats_line", [
-		Arch.disp(cls), Arch.role(cls), int(a["hp"]), int(a["atk"]), int(a["def"]), int(a["speed"]), int(a["range"])
-	])
-	# aparência guardada por classe (ou default)
 	var app: Dictionary = Save.data.get("appearance", {})
 	var saved = app.get(cls, {})
 	cfg["hair_c"] = int(saved.get("hair_c", 1)) if saved is Dictionary else 1
 	cfg["cloth_c"] = int(saved.get("cloth_c", 1)) if saved is Dictionary else 1
-	_refresh_appearance()
+	_refresh_play()
+	_refresh_styles()
 
 # ============ HUD ============
 func _build_hud() -> void:
@@ -548,22 +746,23 @@ func _start_game() -> void:
 	app[cfg["cls"]] = {"hair_c": cfg["hair_c"], "cloth_c": cfg["cloth_c"]}
 	Save.data["appearance"] = app
 	Save.save_profile()
-	creation_root.visible = false
+	for s in [menu_root, play_root, styles_root, settings_root]:
+		if s != null:
+			s.visible = false
 	hud_root.visible = true
 	banner_box.visible = false
 	menu_btn.visible = false
 	coins_label.visible = false
 	arena.setup(cfg)
 
-# Volta ao ecrã de criação e limpa a partida atual.
+# Volta ao menu principal e limpa a partida atual.
 func _return_to_menu() -> void:
 	arena.reset_to_idle()
 	hud_root.visible = false
 	banner_box.visible = false
 	menu_btn.visible = false
 	coins_label.visible = false
-	_refresh_menu_stats()
-	creation_root.visible = true
+	_show_screen(menu_root)
 
 # Fim de jogo: grava o resultado no perfil e mostra as moedas ganhas.
 func _on_match_ended(won: bool, _place: int, coins: int) -> void:

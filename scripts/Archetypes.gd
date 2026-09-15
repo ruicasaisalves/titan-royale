@@ -33,11 +33,11 @@ const DATA := {
 		"name": {"pt": "Bárbaro", "en": "Barbarian"},
 		"role": {"pt": "Dano alto e resistência sólida.", "en": "High damage and solid toughness."},
 	},
-	"Arqueiro": {
+	"Lanceiro": {
 		"hp": 80.0, "atk": 15.0, "def": 3.0, "speed": 87.0, "range": 150.0,
 		"cd": 1.10, "size": 8.0, "color": Color("4fd6c9"),
-		"name": {"pt": "Arqueiro", "en": "Archer"},
-		"role": {"pt": "Ataca de longe. Frágil ao corpo-a-corpo.", "en": "Attacks from afar. Fragile in melee."},
+		"name": {"pt": "Lanceiro", "en": "Spearman"},
+		"role": {"pt": "Ataca à distância com a lança. Frágil ao corpo-a-corpo.", "en": "Attacks at range with the spear. Fragile in melee."},
 	},
 	"Necromante": {
 		"hp": 95.0, "atk": 11.0, "def": 3.0, "speed": 72.0, "range": 130.0,

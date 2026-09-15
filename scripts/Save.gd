@@ -15,7 +15,26 @@ var data := {
 	"coins": 0,
 	"upgrades": {},      # ex.: {"hp": 2} — reservado para a loja futura
 	"appearance": {},    # por classe: {"Bruto": {"hair_c": 3, "cloth_c": 2}, ...}
+	"player_name": "",   # nome do jogador (definido nas Definições)
+	# preferências: brilho (0.5–1.0) e volumes (0–1) de música/efeitos
+	"settings": {"brightness": 1.0, "vol_music": 1.0, "vol_sfx": 1.0},
 }
+
+# Lê uma preferência de settings (com valor por omissão se faltar).
+func get_setting(key: String, default):
+	var s = data.get("settings", {})
+	if s is Dictionary:
+		return s.get(key, default)
+	return default
+
+# Grava uma preferência de settings e persiste.
+func set_setting(key: String, value) -> void:
+	var s = data.get("settings", {})
+	if not (s is Dictionary):
+		s = {}
+	s[key] = value
+	data["settings"] = s
+	save_profile()
 
 func _ready() -> void:
 	load_profile()

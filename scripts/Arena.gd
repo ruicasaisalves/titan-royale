@@ -175,13 +175,13 @@ func _make_fighter(cls: String, ctrl: Controller = null) -> Fighter:
 func _make_player(cfg: Dictionary) -> Fighter:
 	var f := _make_fighter(cfg["cls"], PlayerController.new())
 	var a: Dictionary = Arch.DATA[cfg["cls"]]
-	var pts: Dictionary = cfg["points"]
-	# bónus de herói (+40% vida sobre a base) para 1-contra-99 ser jogável
-	f.max_hp = round(a["hp"] * 1.4 + pts["hp"] * 14.0)
+	# Stats vêm inteiramente da classe (sem pontos à escolha); só o bónus de
+	# herói (+40% vida sobre a base) para 1-contra-99 ser jogável.
+	f.max_hp = round(a["hp"] * 1.4)
 	f.hp = f.max_hp
-	f.atk = a["atk"] + pts["atk"] * 2.0
-	f.def = a["def"] + pts["def"]
-	f.speed = a["speed"] + pts["spd"] * 5.4
+	f.atk = a["atk"]
+	f.def = a["def"]
+	f.speed = a["speed"]
 	f.cd = max(0.27, a["cd"] * 0.6)
 	f.size = max(9.0, a["size"])
 	f.color = cfg["color"]

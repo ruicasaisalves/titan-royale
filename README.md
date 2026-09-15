@@ -86,7 +86,7 @@ Se o export aparecer cinzento ou der um erro de Gradle, é quase sempre
 uma das três versões desalinhadas: editor, templates ou JDK.
 
 ## Próximos passos sugeridos
-- Dar aos ranged (Arqueiro/Necromante) um **projétil** real em vez de golpe instantâneo.
+- Dar aos ranged (Lanceiro/Necromante) um **projétil** real em vez de golpe instantâneo.
 - Sprites/animações: trocar o `_draw()` do `Fighter` por um `AnimatedSprite2D`.
 - Desenhar a UI no editor com um tema próprio (a atual é funcional mas crua).
 - Multiplayer: `RemoteController` + `ENetMultiplayerPeer` (ou Steamworks/Nakama),

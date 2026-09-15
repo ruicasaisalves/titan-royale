@@ -25,7 +25,7 @@ CLASSES = {
     "Tanque":     dict(skin=2, face=1, hair="m5", hair_c=2, cloth=15, cloth_bot_c=2, cloth_top_c=2, weapon=1),
     "Assassino":  dict(skin=2, face=1, hair="m7", hair_c=1, cloth=8,  cloth_bot_c=1, cloth_top_c=1, weapon=3),
     "Barbaro":    dict(skin=3, face=1, hair="m9", hair_c=4, cloth=16, cloth_bot_c=5, cloth_top_c=5, weapon=2),
-    "Arqueiro":   dict(skin=2, face=1, hair="f3", hair_c=3, cloth=5,  cloth_bot_c=3, cloth_top_c=3, weapon=4),
+    "Lanceiro":   dict(skin=2, face=1, hair="f3", hair_c=3, cloth=5,  cloth_bot_c=3, cloth_top_c=3, weapon=4),
     "Necromante": dict(skin=1, face=1, hair="f6", hair_c=7, cloth=9,  cloth_bot_c=7, cloth_top_c=7, weapon=5, weapon_c=3),
     "Sacerdote":  dict(skin=2, face=1, hair="f1", hair_c=6, cloth=10, cloth_bot_c=8, cloth_top_c=6, weapon=5, weapon_c=1),
     "Zombie":     dict(skin=5, face=1, hair="m3", hair_c=5, cloth=16, cloth_bot_c=5, cloth_top_c=5, weapon=0),

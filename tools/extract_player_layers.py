@@ -23,7 +23,7 @@ CLASSES = {
     "Tanque":     dict(skin=2, face=1, hair="m5", cloth=15, weapon=1),
     "Assassino":  dict(skin=2, face=1, hair="m7", cloth=8,  weapon=3),
     "Barbaro":    dict(skin=3, face=1, hair="m9", cloth=16, weapon=2),
-    "Arqueiro":   dict(skin=2, face=1, hair="f3", cloth=5,  weapon=4),
+    "Lanceiro":   dict(skin=2, face=1, hair="f3", cloth=5,  weapon=4),
     "Necromante": dict(skin=1, face=1, hair="f6", cloth=9,  weapon=5, weapon_c=3),
     "Sacerdote":  dict(skin=2, face=1, hair="f1", cloth=10, weapon=5, weapon_c=1),
 }
