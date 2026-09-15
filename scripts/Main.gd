@@ -73,12 +73,24 @@ func _ready() -> void:
 	_show_screen(menu_root)
 
 func _process(_delta: float) -> void:
+	if not hud_root.visible:
+		return
 	# atualiza HP e equipamento do jogador (poll simples)
-	if hud_root.visible and arena.player != null and arena.player.alive:
+	if arena.player != null and arena.player.alive:
 		var p = arena.player
 		hp_fill.size.x = hp_fill.get_parent().size.x * clamp(p.hp / p.max_hp, 0.0, 1.0)
 		hp_label.text = "%s  ·  %s" % [p.display_name, Arch.disp(p.cls)]
 		hud_gear.text = _gear_text(p)
+	# botão de sair persistente (fica disponível mesmo depois de morrer)
+	_update_exit_button()
+
+# Mostra o botão de sair quando o jogador está fora (eliminado) ou o jogo
+# terminou — persistente durante a fase dos titãs, até o jogador sair.
+func _update_exit_button() -> void:
+	if menu_btn == null:
+		return
+	var out: bool = arena.player == null or not arena.player.alive
+	menu_btn.visible = hud_root.visible and (out or arena.phase == Arena.Phase.VICTORY)
 
 func _gear_text(p) -> String:
 	var s := ""
@@ -620,17 +632,21 @@ func _build_hud() -> void:
 	coins_label.visible = false
 	banner_box.add_child(coins_label)
 
-	# botão de voltar ao menu — só aparece quando o jogo acaba (vitória/derrota)
-	var btn_wrap := CenterContainer.new()
-	btn_wrap.custom_minimum_size = Vector2(0, 30)  # folga acima do botão
-	banner_box.add_child(btn_wrap)
+	# botão persistente para sair para o menu — aparece quando o jogador é
+	# eliminado (para poder sair durante a fase dos titãs, sem ficar preso) ou
+	# quando o jogo termina. Fica no HUD (não dentro do banner), para não
+	# desaparecer com os banners transitórios (ex.: "Top 6" auto-esconde-se).
 	menu_btn = Button.new()
 	menu_btn.text = Loc.t("back_to_menu")
-	menu_btn.custom_minimum_size = Vector2(260, 54)
-	menu_btn.add_theme_font_size_override("font_size", 20)
-	menu_btn.pressed.connect(_return_to_menu)
+	menu_btn.add_theme_font_size_override("font_size", 18)
+	menu_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	menu_btn.offset_left = -246
+	menu_btn.offset_right = -16
+	menu_btn.offset_top = 12
+	menu_btn.offset_bottom = 60
 	menu_btn.visible = false
-	btn_wrap.add_child(menu_btn)
+	menu_btn.pressed.connect(_return_to_menu)
+	hud_root.add_child(menu_btn)
 
 	# controlos táteis — só aparecem em ecrãs de toque (ou com FORCE_ON_DESKTOP)
 	if Touch.enabled:
@@ -790,9 +806,10 @@ func _on_banner(big: String, sub: String, dead: bool) -> void:
 	banner_big.add_theme_color_override("font_color", Color("d1453b") if dead else Color("f4c145"))
 	banner_sub.text = sub
 	banner_box.visible = true
-	# fim de jogo (jogador eliminado ou partida terminada) -> mostra o botão
-	# de voltar ao menu, para se poder recomeçar; ganhe ou perca.
-	menu_btn.visible = dead or arena.phase == Arena.Phase.VICTORY
+	# o botão de sair é gerido por _update_exit_button (persistente enquanto o
+	# jogador estiver eliminado ou o jogo terminado); atualiza já para resposta
+	# imediata a esta mudança de estado.
+	_update_exit_button()
 	# banners transitórios desaparecem sozinhos; morte/vitória ficam
 	if not dead and big == Loc.t("banner_top6_big"):
 		await get_tree().create_timer(1.6).timeout
