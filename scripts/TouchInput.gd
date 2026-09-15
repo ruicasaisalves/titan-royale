@@ -13,6 +13,7 @@ var enabled: bool = false
 var move: Vector2 = Vector2.ZERO   # direção do joystick, magnitude 0..1
 var attack: bool = false
 var dash: bool = false
+var special: bool = false
 
 func _ready() -> void:
 	# 'mobile' garante Android/iOS mesmo que a deteção de ecrã táctil falhe
@@ -22,3 +23,4 @@ func reset() -> void:
 	move = Vector2.ZERO
 	attack = false
 	dash = false
+	special = false

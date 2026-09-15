@@ -6,7 +6,7 @@ extends Control
 # Usa make_input_local() pelo mesmo motivo do joystick (ver lá).
 
 var label: String = "A"
-var target: String = "attack"   # "attack" | "dash"
+var target: String = "attack"   # "attack" | "dash" | "special"
 var radius: float = 34.0
 var color: Color = Color("d1453b")
 var _touch_index: int = -1
@@ -32,10 +32,13 @@ func _input(event: InputEvent) -> void:
 
 func _set_down(v: bool) -> void:
 	is_down = v
-	if target == "attack":
-		Touch.attack = v
-	else:
-		Touch.dash = v
+	match target:
+		"attack":
+			Touch.attack = v
+		"special":
+			Touch.special = v
+		_:
+			Touch.dash = v
 	queue_redraw()
 
 func _draw() -> void:

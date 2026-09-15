@@ -33,4 +33,5 @@ func decide(f, arena) -> Intent:
 	intent.move = dir.limit_length(1.0)
 	intent.attack = Input.is_key_pressed(KEY_SPACE) or Touch.attack
 	intent.dash = Input.is_key_pressed(KEY_SHIFT) or Touch.dash
+	intent.special = Input.is_key_pressed(KEY_Q) or Touch.special
 	return intent

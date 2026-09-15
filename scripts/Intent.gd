@@ -8,3 +8,4 @@ extends RefCounted
 var move: Vector2 = Vector2.ZERO
 var attack: bool = false
 var dash: bool = false
+var special: bool = false   # usar o ataque especial da classe (1 por classe)
