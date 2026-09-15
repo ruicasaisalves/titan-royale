@@ -608,20 +608,30 @@ func _build_hud() -> void:
 	hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hp_bg.add_child(hp_label)
 
-	# banner central
+	# banner central — um CenterContainer full-rect centra mesmo o bloco no
+	# ecrã (o antigo PRESET_CENTER só ancorava o canto ao centro, deixando o
+	# texto deslocado). Não bloqueia toques (fase transitória "Top 6").
+	var banner_center := CenterContainer.new()
+	banner_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	banner_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_root.add_child(banner_center)
 	banner_box = VBoxContainer.new()
-	banner_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	banner_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.visible = false
-	hud_root.add_child(banner_box)
+	banner_center.add_child(banner_box)
 	banner_big = Label.new()
 	banner_big.add_theme_font_size_override("font_size", 46)
 	banner_big.add_theme_color_override("font_color", Color("f4c145"))
 	banner_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_big.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	banner_big.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_child(banner_big)
 	banner_sub = Label.new()
 	banner_sub.add_theme_color_override("font_color", Color("ece5d3"))
 	banner_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	banner_sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_child(banner_sub)
 
 	# moedas ganhas nesta partida (aparece no fim)
@@ -629,6 +639,8 @@ func _build_hud() -> void:
 	coins_label.add_theme_font_size_override("font_size", 20)
 	coins_label.add_theme_color_override("font_color", Color("f4c145"))
 	coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	coins_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	coins_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	coins_label.visible = false
 	banner_box.add_child(coins_label)
 
